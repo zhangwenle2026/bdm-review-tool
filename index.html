@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BDM Promotion Review Workbench</title>
+<style>
+:root{--bg:#F5F7FA;--card:#FFFFFF;--txt:#1F2329;--muted:#6B7280;--acc:#3B82F6;--bdr:#E5E7EB;--hover:#EFF6FF;--enc-bg:#F0FDF4;--enc-bdr:#BBF7D0;--enc-txt:#166534;--con-bg:#FFF7ED;--con-bdr:#FED7AA;--con-txt:#9A3412;--inp:#F9FAFB;--shadow:0 1px 3px rgba(0,0,0,.08);}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;font-size:14px;}
+.hdr{background:var(--card);border-bottom:1px solid var(--bdr);padding:0 28px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:var(--shadow);}
+.logo{display:flex;align-items:center;gap:10px;}
+.logo-badge{background:#0F3460;color:#fff;padding:3px 9px;border-radius:4px;font-size:10px;font-weight:800;letter-spacing:1.5px;}
+.logo h1{font-size:15px;font-weight:600;}.logo p{font-size:11px;color:var(--muted);margin-top:1px;}
+.langs{display:flex;gap:4px;}
+.lb{padding:4px 12px;border:1px solid var(--bdr);background:transparent;color:var(--muted);border-radius:20px;cursor:pointer;font-size:12px;font-weight:500;transition:all .15s ease;}
+.lb:hover{border-color:var(--acc);color:var(--acc);}.lb.on{background:var(--acc);color:#fff;border-color:var(--acc);}
+.idbar{background:var(--card);border-bottom:1px solid var(--bdr);padding:10px 28px;display:flex;align-items:center;gap:12px;}
+.idbar label{font-size:12px;color:var(--muted);}
+.idsel{background:var(--inp);border:1px solid var(--bdr);color:var(--txt);padding:6px 12px;border-radius:6px;font-size:13px;min-width:220px;cursor:pointer;transition:border-color .15s;}
+.idsel:focus{outline:none;border-color:var(--acc);}
+.idbadge{background:var(--hover);color:var(--acc);border:1px solid #BFDBFE;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;display:none;}
+.idbadge.on{display:inline-block;}
+.main{padding:28px;}
+.sec-lbl{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:16px;}
+.tw{overflow-x:auto;background:var(--card);border:1px solid var(--bdr);border-radius:10px;box-shadow:var(--shadow);}
+table{width:100%;border-collapse:collapse;min-width:1700px;}
+thead{border-bottom:1px solid var(--bdr);}
+th{padding:10px 16px;text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);white-space:nowrap;background:var(--card);}
+tbody tr{border-bottom:1px solid var(--bdr);transition:background .15s ease;}
+tbody tr:last-child{border-bottom:none;}
+tbody tr:hover{background:var(--hover);}
+td{padding:13px 16px;font-size:13px;vertical-align:top;}
+.td-n{font-weight:600;font-size:14px;color:var(--txt);}
+.td-mis{font-size:11px;color:var(--muted);margin-top:2px;}
+.td-time{font-size:12px;color:#D97706;font-weight:500;white-space:nowrap;}
+.upbtn{border:1.5px dashed #D1D5DB;background:transparent;color:var(--muted);padding:7px 13px;border-radius:6px;cursor:pointer;font-size:12px;transition:all .15s;white-space:nowrap;display:flex;align-items:center;gap:5px;}
+.upbtn:hover{border-color:var(--acc);color:var(--acc);}.upbtn.has{border-style:solid;border-color:#16A34A;color:#16A34A;background:#F0FDF4;}
+.chips{display:flex;flex-wrap:wrap;gap:4px;max-width:160px;}
+.chip{background:var(--hover);border:1px solid #BFDBFE;color:var(--acc);padding:2px 8px;border-radius:4px;font-size:11px;}
+.chip.em{background:transparent;border:1px dashed var(--bdr);color:var(--muted);font-style:italic;font-size:11px;}
+.ai-badge{display:inline-flex;align-items:center;gap:3px;background:#F3F4F6;border:1px solid var(--bdr);color:var(--muted);padding:1px 6px;border-radius:3px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
+.enbtn{border:1px solid var(--acc);background:transparent;color:var(--acc);padding:7px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:500;white-space:nowrap;transition:all .2s ease;}
+.enbtn:hover{background:var(--acc);color:#fff;transform:translateY(-1px);box-shadow:0 2px 8px rgba(59,130,246,.25);}
+.fbc{min-width:160px;max-width:190px;}
+.fb-card{border-radius:6px;padding:8px 10px;margin-bottom:6px;border:1px solid;}
+.fb-card.enc{background:var(--enc-bg);border-color:var(--enc-bdr);}
+.fb-card.con{background:var(--con-bg);border-color:var(--con-bdr);}
+.fb-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
+.fb-lbl.enc{color:var(--enc-txt);}.fb-lbl.con{color:var(--con-txt);}
+.fb-txt{font-size:11px;line-height:1.5;color:var(--txt);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+.fb-empty{border:1.5px dashed var(--bdr);border-radius:6px;padding:10px;text-align:center;color:var(--muted);font-size:11px;font-style:italic;}
+.rptbtn{background:transparent;border:1px solid #7C3AED;color:#7C3AED;padding:6px 11px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:500;width:100%;transition:all .2s;white-space:nowrap;}
+.rptbtn:hover{background:#7C3AED;color:#fff;transform:translateY(-1px);}
+.rptbtn:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+.rpt-content{margin-top:8px;font-size:11px;line-height:1.6;}
+.rpt-en{color:#4C1D95;margin-bottom:6px;}.rpt-pt{color:#7C2D12;}
+.rov{display:none;position:fixed;inset:0;background:var(--bg);z-index:200;flex-direction:column;}
+.rov.entering{opacity:0;transform:translateX(20px);}
+.rov.on{display:flex;animation:rovIn .25s ease forwards;}
+@keyframes rovIn{from{opacity:0;transform:translateX(20px);}to{opacity:1;transform:translateX(0);}}
+.rtop{background:var(--card);border-bottom:1px solid var(--bdr);padding:0 24px;height:54px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;box-shadow:var(--shadow);}
+.rtop-left h2{font-size:16px;font-weight:600;}.rtop-left p{font-size:12px;color:var(--muted);margin-top:1px;}
+.xbtn{border:1px solid var(--bdr);background:transparent;color:var(--muted);width:32px;height:32px;border-radius:6px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.xbtn:hover{border-color:#EF4444;color:#EF4444;background:#FEF2F2;}
+.rcols{display:flex;flex:1;overflow:hidden;}
+.rcol{flex:1;display:flex;flex-direction:column;border-right:1px solid var(--bdr);overflow:hidden;}
+.rcol:nth-child(2){flex:1.1;}
+.rcol:last-child{border-right:none;}
+.rch{background:var(--card);border-bottom:1px solid var(--bdr);padding:10px 20px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.rcb{flex:1;overflow-y:auto;padding:20px;}
+.pptarea{background:var(--card);border:1px solid var(--bdr);border-radius:8px;min-height:400px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;text-align:center;padding:48px;color:var(--muted);}
+.tbtns{display:flex;gap:4px;}
+.tbtn{background:transparent;border:1px solid var(--bdr);color:var(--muted);padding:3px 10px;border-radius:4px;cursor:pointer;font-size:11px;transition:all .15s;}
+.tbtn:hover{border-color:var(--acc);color:var(--acc);}.tbtn.on{background:var(--acc);color:#fff;border-color:var(--acc);}
+.aiarea{background:var(--card);border:1px solid var(--bdr);border-radius:8px;padding:18px;}
+.ai-sec{margin-bottom:18px;}.ai-sec h4{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--acc);margin-bottom:8px;}
+.ai-sec p,.ai-sec li{font-size:13px;line-height:1.7;color:var(--txt);}
+.ai-sec ul{padding-left:16px;}.ai-sec li{margin-bottom:4px;}
+.hi{background:#EFF6FF;color:var(--acc);padding:1px 5px;border-radius:3px;font-weight:500;}
+.aip{color:var(--muted);font-style:italic;font-size:13px;text-align:center;padding:48px 20px;}
+.genbtn{background:transparent;border:1px solid var(--acc);color:var(--acc);padding:4px 12px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:500;transition:all .15s;}
+.genbtn:hover{background:var(--acc);color:#fff;}
+.fbform{display:flex;flex-direction:column;gap:16px;}
+.reviewer-tag{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--inp);border:1px solid var(--bdr);border-radius:8px;}
+.reviewer-tag .dot{width:8px;height:8px;border-radius:50%;background:var(--acc);flex-shrink:0;}
+.reviewer-tag span{font-size:13px;font-weight:500;}
+.fbl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;display:flex;align-items:center;gap:5px;margin-bottom:8px;}
+.fbl.enc{color:var(--enc-txt);}.fbl.con{color:var(--con-txt);}
+.fbform textarea{width:100%;background:var(--inp);border:1px solid var(--bdr);color:var(--txt);padding:11px 13px;border-radius:8px;font-size:13px;line-height:1.6;resize:vertical;min-height:120px;font-family:inherit;transition:border-color .2s,box-shadow .2s;}
+.fbform textarea:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px rgba(59,130,246,.12);}
+.asv{font-size:11px;color:#9CA3AF;text-align:right;height:16px;transition:color .3s;}.asv.ok{color:#16A34A;}
+.svbtn{background:transparent;border:1px solid var(--bdr);color:var(--muted);padding:8px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:500;width:100%;transition:all .15s;}
+.svbtn:hover{border-color:var(--acc);color:var(--acc);}
+.subbtn{background:#16A34A;color:#fff;border:none;padding:11px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;width:100%;transition:all .2s;margin-top:2px;}
+.subbtn:hover{background:#15803D;transform:translateY(-1px);box-shadow:0 2px 8px rgba(22,163,74,.3);}
+.subnote{background:#F0FDF4;border:1px solid var(--enc-bdr);color:var(--enc-txt);padding:11px;border-radius:8px;font-size:12px;text-align:center;display:none;}
+.subnote.on{display:block;}
+.mbg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:400;align-items:center;justify-content:center;}
+.mbg.on{display:flex;}
+.mbox{background:var(--card);border:1px solid var(--bdr);border-radius:12px;padding:32px;max-width:420px;width:90%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.12);}
+.mbox h3{font-size:17px;font-weight:600;margin-bottom:10px;}.mbox p{color:var(--muted);font-size:13px;line-height:1.6;margin-bottom:24px;}
+.mbtns{display:flex;gap:10px;justify-content:center;}
+.mbcancel{padding:9px 22px;border:1px solid var(--bdr);background:transparent;color:var(--txt);border-radius:6px;cursor:pointer;font-size:13px;transition:all .15s;}
+.mbcancel:hover{border-color:var(--acc);color:var(--acc);}
+.mbconfirm{padding:9px 22px;background:#16A34A;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;transition:all .15s;}
+.mbconfirm:hover{background:#15803D;}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid var(--bdr);border-top-color:var(--acc);border-radius:50%;animation:sp .7s linear infinite;vertical-align:middle;margin-right:4px;}
+@keyframes sp{to{transform:rotate(360deg);}}
+::-webkit-scrollbar{width:5px;height:5px;}::-webkit-scrollbar-thumb{background:#D1D5DB;border-radius:3px;}
+
+</style>
+</head>
+<body>
+<header class="hdr">
+  <div class="logo">
+    <span class="logo-badge">KEETA</span>
+    <div>
+      <h1 id="hTitle">BDM Promotion Review Workbench</h1>
+      <p id="hSub">BDM晋升评审工作台 · 2026</p>
+    </div>
+  </div>
+  <div class="langs">
+    <button class="lb on" onclick="setLang('en',this)">EN</button>
+    <button class="lb" onclick="setLang('zh',this)">中文</button>
+    <button class="lb" onclick="setLang('pt',this)">PT</button>
+  </div>
+</header>
+
+<div class="idbar">
+  <label id="lblId">You are reviewing as:</label>
+  <select class="idsel" id="idSel" onchange="onIdChange(this.value)">
+    <option value="">— Select your identity —</option>
+    <option value="Eric Zhang">Eric Zhang</option>
+    <option value="Ava Tian">Ava Tian</option>
+    <option value="James Feng">James Feng</option>
+    <option value="Daniel Albuquerque">Daniel Albuquerque</option>
+    <option value="Jay Lin">Jay Lin</option>
+    <option value="Observer">Observer / HR (旁听)</option>
+  </select>
+  <span class="idbadge" id="idBadge"></span>
+</div>
+
+<div class="main">
+  <div class="sec-lbl" id="lblSec">Candidate Overview · 候选人总览</div>
+  <div class="tw">
+    <table>
+      <thead><tr id="tHead"></tr></thead>
+      <tbody id="tBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="rov" id="rov">
+  <div class="rtop">
+    <div class="rtop-left">
+      <h2 id="rName">—</h2>
+      <p id="rInfo">—</p>
+    </div>
+    <button class="xbtn" onclick="closeReview()">×</button>
+  </div>
+  <div class="rcols">
+    <div class="rcol">
+      <div class="rch">
+        <span id="lblPPT">📄 Presentation</span>
+        <div class="tbtns">
+          <button class="tbtn on" onclick="transLang('en',this)">EN</button>
+          <button class="tbtn" onclick="transLang('zh',this)">中</button>
+          <button class="tbtn" onclick="transLang('pt',this)">PT</button>
+        </div>
+      </div>
+      <div class="rcb">
+        <div class="pptarea" id="pptArea">
+          <div style="font-size:32px;opacity:.25">📤</div>
+          <div id="lblNoPPT" style="font-size:13px;color:#6B7280">No presentation uploaded yet</div>
+          <div id="lblNoPPTSub" style="font-size:11px;color:#9CA3AF;margin-top:4px">Upload from the main table</div>
+        </div>
+      </div>
+    </div>
+    <div class="rcol">
+      <div class="rch">
+        <span id="lblAI">🤖 AI Analysis</span>
+        <button class="genbtn" id="genBtn" onclick="genSummary()">Generate</button>
+      </div>
+      <div class="rcb">
+        <div id="aiArea"><p class="aip" id="lblAIWait">Click "Generate" to analyze the presentation with AI.</p></div>
+      </div>
+    </div>
+    <div class="rcol">
+      <div class="rch" id="lblFB">💬 Feedback</div>
+      <div class="rcb">
+        <div class="fbform" id="fbForm">
+          <div class="reviewer-tag">
+            <div class="dot"></div>
+            <span id="reviewerName">No identity selected</span>
+          </div>
+          <div>
+            <div class="fbl enc" id="lblEnc">✦ Encouraging Feedback</div>
+            <textarea id="taEnc" placeholder="What did this candidate do particularly well?"></textarea>
+          </div>
+          <div>
+            <div class="fbl con" id="lblCon">◈ Constructive Feedback</div>
+            <textarea id="taCon" placeholder="What areas could be developed further?"></textarea>
+          </div>
+          <div class="asv" id="asvLbl"></div>
+          <button class="svbtn" onclick="saveFeedback()">💾 <span id="lblSave">Save</span></button>
+          <button class="subbtn" onclick="openModal()">✓ <span id="lblSub">Submit Feedback</span></button>
+          <div class="subnote" id="subNote">✓ Feedback submitted · 已提交反馈</div>
+        </div>
+        <div id="observerView" style="display:none;padding:20px;text-align:center;color:#6B7280;font-size:13px;">
+          👁 Observer mode — read only<br>
+          <span style="font-size:11px;margin-top:6px;display:block">旁听模式，仅可查看</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mbg" id="mBg">
+  <div class="mbox">
+    <h3 id="mTitle">Submit Feedback</h3>
+    <p id="mMsg">Once submitted, your feedback will be visible to all reviewers on the main page. This cannot be undone.</p>
+    <div class="mbtns">
+      <button class="mbcancel" onclick="closeModal()" id="mCancel">Cancel</button>
+      <button class="mbconfirm" onclick="confirmSub()" id="mConfirm">Confirm & Submit</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const GEMINI_KEY = "AIzaSyCWDRZCir7IG4raqvvYCnT9AwG2BXUvbDE";
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`;
+
+const fbApp = initializeApp({
+  apiKey: "AIzaSyCWDRZCir7IG4raqvvYCnT9AwG2BXUvbDE",
+  authDomain: "bdm-review-tool.firebaseapp.com",
+  databaseURL: "https://bdm-review-tool-default-rtdb.firebaseio.com",
+  projectId: "bdm-review-tool",
+  storageBucket: "bdm-review-tool.appspot.com",
+  messagingSenderId: "000000000",
+  appId: "placeholder"
+});
+const db = getDatabase(fbApp);
+
+const CANDS = [
+  {id:"lucas",   name:"Lucas Nada",       mis:"", time:"09:20–10:00"},
+  {id:"karina",  name:"Karina Colomina",   mis:"", time:"10:00–10:40"},
+  {id:"leonardo",name:"Leonardo Mello",    mis:"", time:"10:40–11:20"},
+  {id:"cleiton", name:"Cleiton Santos",    mis:"", time:"11:20–12:00"},
+  {id:"adriana", name:"Adriana Naves",     mis:"", time:"13:30–14:10"},
+  {id:"igor",    name:"Igor Feitosa",      mis:"", time:"14:10–14:50"},
+  {id:"thiago",  name:"Thiago Dalaqua",    mis:"", time:"14:50–15:30"},
+  {id:"sabrina", name:"Sabrina Fernandes", mis:"", time:"15:30–16:10"},
+];
+const REVIEWERS = ["Eric Zhang","Ava Tian","James Feng","Daniel Albuquerque","Jay Lin"];
+
+const T = {
+  en:{
+    hTitle:"BDM Promotion Review Workbench", hSub:"BDM晋升评审工作台 · 2026",
+    lblId:"You are reviewing as:", lblSec:"Candidate Overview",
+    thName:"Candidate", thMis:"MIS ID", thTime:"Time", thMat:"Material",
+    thInfo:"Basic Info", thEnt:"Review", thRpt:"AI Report",
+    btnEnt:"Enter Review", btnUp:"📎 Upload PPT",
+    lblPPT:"📄 Presentation", lblAI:"🤖 AI Analysis", lblFB:"💬 Feedback",
+    lblEnc:"✦ Encouraging Feedback", lblCon:"◈ Constructive Feedback",
+    lblSave:"Save", lblSub:"Submit Feedback",
+    mT:"Submit Feedback", mM:"Once submitted, your feedback will be visible to all reviewers. This cannot be undone.",
+    mCancel:"Cancel", mConfirm:"Confirm & Submit",
+    noPPT:"No presentation uploaded yet", noPPTSub:"Upload from the main table",
+    aiWait:"Click \"Generate\" to analyze the presentation with AI.",
+    subNote:"✓ Feedback submitted", genBtn:"Generate", asv:"Saved ✓",
+    encL:"Encouraging", conL:"Constructive", noId:"No identity selected",
+    btnRpt:"Generate Report", aiLabel:"AI Generated",
+    transTitle:"Translated Content", genAnalysis:"Generating analysis…",
+  },
+  zh:{
+    hTitle:"BDM晋升评审工作台", hSub:"BDM Promotion Review Workbench · 2026",
+    lblId:"当前身份：", lblSec:"候选人总览",
+    thName:"候选人", thMis:"MIS号", thTime:"答辩时间", thMat:"答辩材料",
+    thInfo:"基本信息", thEnt:"评审入口", thRpt:"AI反馈报告",
+    btnEnt:"进入评审", btnUp:"📎 上传PPT",
+    lblPPT:"📄 答辩材料", lblAI:"🤖 AI分析", lblFB:"💬 评审反馈",
+    lblEnc:"✦ 激励性反馈", lblCon:"◈ 建设性反馈",
+    lblSave:"保存", lblSub:"提交反馈",
+    mT:"提交反馈", mM:"确认提交？提交后所有评审人可见，不可撤回。",
+    mCancel:"取消", mConfirm:"确认提交",
+    noPPT:"暂未上传答辩材料", noPPTSub:"在主页表格中上传",
+    aiWait:"点击「生成」，AI将分析答辩材料。",
+    subNote:"✓ 已提交反馈", genBtn:"生成分析", asv:"已保存 ✓",
+    encL:"激励性", conL:"建设性", noId:"未选择身份",
+    btnRpt:"生成报告", aiLabel:"AI 生成", transTitle:"翻译内容",
+    genAnalysis:"正在生成分析…",
+  },
+  pt:{
+    hTitle:"Bancada de Avaliação BDM", hSub:"BDM晋升评审工作台 · 2026",
+    lblId:"Você está como:", lblSec:"Visão Geral dos Candidatos",
+    thName:"Candidato", thMis:"MIS ID", thTime:"Horário", thMat:"Material",
+    thInfo:"Informações", thEnt:"Avaliar", thRpt:"Relatório AI",
+    btnEnt:"Entrar na Avaliação", btnUp:"📎 Enviar PPT",
+    lblPPT:"📄 Apresentação", lblAI:"🤖 Análise AI", lblFB:"💬 Feedback",
+    lblEnc:"✦ Feedback Encorajador", lblCon:"◈ Feedback Construtivo",
+    lblSave:"Salvar", lblSub:"Enviar Feedback",
+    mT:"Enviar Feedback", mM:"Tem certeza? Seu feedback ficará visível a todos. Não pode ser desfeito.",
+    mCancel:"Cancelar", mConfirm:"Confirmar",
+    noPPT:"Nenhuma apresentação enviada", noPPTSub:"Envie pela tabela principal",
+    aiWait:"Clique em \"Gerar\" para analisar com AI.",
+    subNote:"✓ Feedback enviado", genBtn:"Gerar", asv:"Salvo ✓",
+    encL:"Encorajador", conL:"Construtivo", noId:"Nenhuma identidade selecionada",
+    btnRpt:"Gerar Relatório", aiLabel:"Gerado por AI", transTitle:"Conteúdo Traduzido",
+    genAnalysis:"Gerando análise…",
+  }
+};
+
+let lang = "en", me = "", curId = "", asTimer = null, snap = {};
+
+// Real-time listener
+onValue(ref(db, "reviews"), s => {
+  snap = s.val() || {};
+  renderTable();
+});
+
+// Language
+window.setLang = (l, btn) => {
+  lang = l;
+  document.querySelectorAll(".lb").forEach(b => b.classList.remove("on"));
+  if (btn) btn.classList.add("on");
+  applyI18n();
+  renderTable();
+};
+
+function applyI18n() {
+  const t = T[lang];
+  const map = [
+    ["hTitle","hTitle"],["hSub","hSub"],["lblId","lblId"],["lblSec","lblSec"],
+    ["lblPPT","lblPPT"],["lblAI","lblAI"],["lblFB","lblFB"],
+    ["lblEnc","lblEnc"],["lblCon","lblCon"],["genBtn","genBtn"],
+    ["mTitle","mT"],["mMsg","mM"],["mCancel","mCancel"],["mConfirm","mConfirm"],
+    ["subNote","subNote"],["lblNoPPT","noPPT"],["lblNoPPTSub","noPPTSub"],
+    ["lblAIWait","aiWait"],["lblSave","lblSave"],["lblSub","lblSub"],
+    ["reviewerName","noId"],
+  ];
+  map.forEach(([id,k]) => { const el = document.getElementById(id); if(el && !el.dataset.live) el.textContent = t[k]; });
+}
+
+// Identity
+window.onIdChange = v => {
+  me = v;
+  const b = document.getElementById("idBadge");
+  b.textContent = v || "";
+  b.classList.toggle("on", !!v);
+  if (curId) loadMyFeedback(curId);
+};
+
+// Table
+function renderTable() {
+  const t = T[lang];
+  document.getElementById("tHead").innerHTML =
+    [t.thName, t.thMis, t.thTime, t.thMat, t.thInfo, t.thEnt,
+     ...REVIEWERS, t.thRpt].map(c => `<th>${c}</th>`).join("");
+
+  const tbody = document.getElementById("tBody");
+  tbody.innerHTML = "";
+  CANDS.forEach(c => {
+    const cd = snap[c.id] || {};
+    const fileB64 = cd.fileBase64 || "";
+    const fileName = cd.fileName || "";
+    const basicInfo = cd.basicInfo || "";
+    const aiReport = cd.aiReport || "";
+    const tr = document.createElement("tr");
+    let html = "";
+
+    // Name + MIS
+    html += `<td><div class="td-n">${c.name}</div><div class="td-mis">${c.mis || "—"}</div></td>`;
+    // Time
+    html += `<td><div class="td-time">⏰ ${c.time}</div></td>`;
+    // Upload
+    html += `<td>
+      <input type="file" id="fi_${c.id}" accept=".pdf,.ppt,.pptx" style="display:none" onchange="uploadFile('${c.id}',this)">
+      <button class="upbtn ${fileB64?'has':''}" onclick="document.getElementById('fi_${c.id}').click()">
+        ${fileB64 ? `✓ ${fileName||'File uploaded'}` : t.btnUp}
+      </button>
+    </td>`;
+    // Basic Info
+    if (basicInfo) {
+      const parts = basicInfo.split("|").filter(Boolean);
+      html += `<td><div class="ai-badge">✦ AI</div><div class="chips">${parts.map(p=>`<span class="chip">${p.trim()}</span>`).join("")}</div></td>`;
+    } else {
+      html += `<td><div class="chips"><span class="chip em">${fileB64?"analyzing…":"—"}</span></div></td>`;
+    }
+    // Enter review
+    html += `<td><button class="enbtn" onclick="openReview('${c.id}')">${t.btnEnt} →</button></td>`;
+    // Reviewer columns
+    REVIEWERS.forEach(rv => {
+      const rk = rv.replace(/\s+/g, "_");
+      const fd = (cd.feedback && cd.feedback[rk]) || {};
+      if (fd.submitted && (fd.encouraging || fd.constructive)) {
+        html += `<td class="fbc">
+          ${fd.encouraging ? `<div class="fb-card enc"><div class="fb-lbl enc">${t.encL}</div><div class="fb-txt">${fd.encouraging}</div></div>` : ""}
+          ${fd.constructive ? `<div class="fb-card con"><div class="fb-lbl con">${t.conL}</div><div class="fb-txt">${fd.constructive}</div></div>` : ""}
+        </td>`;
+      } else {
+        html += `<td class="fbc"><div class="fb-empty">—</div></td>`;
+      }
+    });
+    // AI Report
+    if (aiReport) {
+      html += `<td style="min-width:180px;max-width:220px">
+        <div class="ai-badge">✦ AI</div>
+        <div class="rpt-content"><div class="rpt-en">${aiReport.en||""}</div><div class="rpt-pt">${aiReport.pt||""}</div></div>
+      </td>`;
+    } else {
+      const allSubmitted = REVIEWERS.every(rv => {
+        const rk = rv.replace(/\s+/g,"_");
+        return cd.feedback && cd.feedback[rk] && cd.feedback[rk].submitted;
+      });
+      html += `<td><button class="rptbtn" ${allSubmitted?"":"disabled"} onclick="genReport('${c.id}')">${t.btnRpt}</button></td>`;
+    }
+
+    tr.innerHTML = html;
+    tbody.appendChild(tr);
+  });
+}
+
+// Upload file → base64 → Firebase + auto-extract basic info
+window.uploadFile = async (id, input) => {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async e => {
+    const b64 = e.target.result.split(",")[1];
+    await update(ref(db, `reviews/${id}`), { fileBase64: b64, fileName: file.name, fileType: file.type });
+    // Auto-extract basic info
+    extractBasicInfo(id, b64, file.type);
+  };
+  reader.readAsDataURL(file);
+};
+
+async function extractBasicInfo(id, b64, mime) {
+  try {
+    const prompt = `You are analyzing a BD candidate's promotion presentation. Extract basic personal info in this exact format (pipe-separated, no explanation):
+[Name] | [Education level] | [Years of BD experience] | [City/Region]
+Only return the pipe-separated line, nothing else.`;
+    const body = { contents:[{ parts:[
+      { text: prompt },
+      { inline_data:{ mime_type: mime.includes("pdf")?"application/pdf":"application/vnd.ms-powerpoint", data: b64 }}
+    ]}]};
+    const res = await fetch(GEMINI_URL, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)});
+    const data = await res.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    if (text.includes("|")) {
+      await update(ref(db, `reviews/${id}`), { basicInfo: text.trim() });
+    }
+  } catch(e) { console.warn("basicInfo extraction failed", e); }
+}
+
+// Open review
+window.openReview = id => {
+  curId = id;
+  const c = CANDS.find(x => x.id === id);
+  const cd = snap[id] || {};
+  document.getElementById("rName").textContent = c.name;
+  document.getElementById("rInfo").textContent = `⏰ ${c.time}`;
+  // PPT
+  const pptArea = document.getElementById("pptArea");
+  if (cd.fileBase64) {
+    const mime = (cd.fileType || "application/pdf").includes("pdf") ? "application/pdf" : "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+    const dataUrl = `data:${mime};base64,${cd.fileBase64}`;
+    if (mime === "application/pdf") {
+      pptArea.innerHTML = `<embed src="${dataUrl}" width="100%" height="520" type="application/pdf" style="border-radius:6px">`;
+    } else {
+      // For PPT use Google Docs viewer (needs public URL — show fallback)
+      pptArea.innerHTML = `<div style="padding:32px;text-align:center;color:#6B7280;font-size:13px">
+        <div style="font-size:28px;margin-bottom:12px">📊</div>
+        <div style="font-weight:600;margin-bottom:6px">${cd.fileName}</div>
+        <div style="font-size:11px;color:#9CA3AF">PPT preview requires a public URL.<br>PDF files can be previewed directly.</div>
+      </div>`;
+    }
+  } else {
+    pptArea.innerHTML = `<div style="font-size:32px;opacity:.25">📤</div>
+      <div style="font-size:13px;color:#6B7280" id="lblNoPPT">${T[lang].noPPT}</div>
+      <div style="font-size:11px;color:#9CA3AF;margin-top:4px">${T[lang].noPPTSub}</div>`;
+  }
+  // AI summary
+  const aiArea = document.getElementById("aiArea");
+  if (cd.aiSummary) {
+    renderAISummary(cd.aiSummary);
+  } else {
+    aiArea.innerHTML = `<p class="aip">${T[lang].aiWait}</p>`;
+  }
+  // Feedback form
+  loadMyFeedback(id);
+  // Show overlay
+  const rov = document.getElementById("rov");
+  rov.classList.add("on");
+  document.body.style.overflow = "hidden";
+};
+
+window.closeReview = () => {
+  document.getElementById("rov").classList.remove("on");
+  document.body.style.overflow = "";
+  curId = "";
+};
+
+// Translation
+window.transLang = (l, btn) => {
+  document.querySelectorAll(".tbtn").forEach(b => b.classList.remove("on"));
+  if (btn) btn.classList.add("on");
+  const cd = snap[curId] || {};
+  if (!cd.fileBase64) return;
+  if (l === "en") {
+    // Re-render original or re-run
+    genTranslation(curId, l);
+  } else {
+    genTranslation(curId, l);
+  }
+};
+
+async function genTranslation(id, targetLang) {
+  const cd = snap[id] || {};
+  if (!cd.fileBase64) return;
+  const pptArea = document.getElementById("pptArea");
+  pptArea.innerHTML = `<div class="spin"></div> Translating…`;
+  try {
+    const langMap = { en:"English", zh:"Chinese (Simplified)", pt:"Brazilian Portuguese" };
+    const prompt = `Extract ALL text content from this presentation file and translate it into ${langMap[targetLang]}. Format as clean readable text preserving slide structure. Do not add commentary.`;
+    const body = { contents:[{ parts:[
+      { text: prompt },
+      { inline_data:{ mime_type: cd.fileType||"application/pdf", data: cd.fileBase64 }}
+    ]}]};
+    const res = await fetch(GEMINI_URL, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    const data = await res.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "Translation failed.";
+    pptArea.innerHTML = `<div style="background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:20px;font-size:13px;line-height:1.8;white-space:pre-wrap;text-align:left;width:100%">${text}</div>`;
+  } catch(e) {
+    pptArea.innerHTML = `<div style="color:#EF4444;font-size:13px">Translation failed. Please try again.</div>`;
+  }
+}
+
+// Generate AI Summary
+window.genSummary = async () => {
+  const cd = snap[curId] || {};
+  const btn = document.getElementById("genBtn");
+  const aiArea = document.getElementById("aiArea");
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spin"></span>${T[lang].genAnalysis||"Analyzing…"}`;
+  aiArea.innerHTML = `<p class="aip"><span class="spin"></span> Analyzing presentation…</p>`;
+  try {
+    let prompt = `Analyze this BD candidate's promotion presentation and provide a structured evaluation in both English and Chinese. Use this exact JSON format:
+{
+  "background_en": "Brief background summary in English",
+  "background_zh": "简要背景摘要",
+  "strengths_en": ["strength 1", "strength 2", "strength 3"],
+  "strengths_zh": ["优势1", "优势2", "优势3"],
+  "risks_en": ["risk/gap 1", "risk/gap 2"],
+  "risks_zh": ["风险1", "风险2"],
+  "assessment_en": "Overall assessment in 2-3 sentences",
+  "assessment_zh": "总体评估，2-3句话"
+}
+Return only valid JSON, no other text.`;
+    let parts = [{ text: prompt }];
+    if (cd.fileBase64) {
+      parts.push({ inline_data:{ mime_type: cd.fileType||"application/pdf", data: cd.fileBase64 }});
+    } else {
+      const c = CANDS.find(x => x.id === curId);
+      parts[0].text = `Provide a structured evaluation for BD candidate "${c?.name}" applying for BDM promotion. Use fictional but realistic content. ` + prompt;
+    }
+    const body = { contents:[{ parts }]};
+    const res = await fetch(GEMINI_URL, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    const data = await res.json();
+    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+    const clean = raw.replace(/```json\n?/g,"").replace(/```\n?/g,"").trim();
+    let parsed;
+    try { parsed = JSON.parse(clean); } catch(e) { parsed = { assessment_en: raw, assessment_zh: raw }; }
+    await update(ref(db, `reviews/${curId}`), { aiSummary: parsed });
+    renderAISummary(parsed);
+  } catch(e) {
+    aiArea.innerHTML = `<p class="aip" style="color:#EF4444">Analysis failed. Please try again.</p>`;
+  }
+  btn.disabled = false;
+  btn.textContent = T[lang].genBtn;
+};
+
+function renderAISummary(s) {
+  const aiArea = document.getElementById("aiArea");
+  const mkList = (arr) => arr ? arr.map(i=>`<li>${i}</li>`).join("") : "";
+  aiArea.innerHTML = `<div class="aiarea">
+    <div class="ai-badge">✦ AI Generated</div>
+    ${s.background_en ? `<div class="ais"><h4>Background / 背景</h4><p>${s.background_en}</p>${s.background_zh?`<p style="color:#6B7280;margin-top:6px">${s.background_zh}</p>`:""}</div>` : ""}
+    ${s.strengths_en ? `<div class="ais"><h4>Key Strengths / 核心优势</h4><ul>${mkList(s.strengths_en)}</ul>${s.strengths_zh?`<ul style="color:#6B7280;margin-top:6px">${mkList(s.strengths_zh)}</ul>`:""}</div>` : ""}
+    ${s.risks_en ? `<div class="ais"><h4>Areas to Develop / 成长空间</h4><ul>${mkList(s.risks_en)}</ul>${s.risks_zh?`<ul style="color:#6B7280;margin-top:6px">${mkList(s.risks_zh)}</ul>`:""}</div>` : ""}
+    ${s.assessment_en ? `<div class="ais"><h4>Overall Assessment / 综合评估</h4><p>${s.assessment_en}</p>${s.assessment_zh?`<p style="color:#6B7280;margin-top:6px">${s.assessment_zh}</p>`:""}</div>` : ""}
+  </div>`;
+}
+
+// Feedback
+function loadMyFeedback(id) {
+  const isObserver = me === "Observer";
+  document.getElementById("fbForm").style.display = isObserver ? "none" : "flex";
+  document.getElementById("observerView").style.display = isObserver ? "block" : "none";
+  if (isObserver) return;
+
+  const rn = document.getElementById("reviewerName");
+  rn.textContent = me || T[lang].noId;
+  rn.dataset.live = "1";
+
+  if (!me) { document.getElementById("taEnc").value = ""; document.getElementById("taCon").value = ""; return; }
+  const rk = me.replace(/\s+/g,"_");
+  const cd = snap[id] || {};
+  const fd = (cd.feedback && cd.feedback[rk]) || {};
+  document.getElementById("taEnc").value = fd.encouraging || fd.draft_enc || "";
+  document.getElementById("taCon").value = fd.constructive || fd.draft_con || "";
+  const submitted = fd.submitted || false;
+  document.getElementById("taEnc").disabled = submitted;
+  document.getElementById("taCon").disabled = submitted;
+  document.getElementById("subNote").classList.toggle("on", submitted);
+  document.querySelector(".subbtn").style.display = submitted ? "none" : "block";
+  document.querySelector(".svbtn").style.display = submitted ? "none" : "block";
+
+  // Auto-save
+  const inputs = [document.getElementById("taEnc"), document.getElementById("taCon")];
+  inputs.forEach(ta => {
+    ta.oninput = () => {
+      clearTimeout(asTimer);
+      const asvLbl = document.getElementById("asvLbl");
+      asvLbl.textContent = "";
+      asvLbl.classList.remove("ok");
+      asTimer = setTimeout(() => autoSave(id), 1500);
+    };
+  });
+}
+
+async function autoSave(id) {
+  if (!me || me === "Observer") return;
+  const rk = me.replace(/\s+/g,"_");
+  const enc = document.getElementById("taEnc").value;
+  const con = document.getElementById("taCon").value;
+  await update(ref(db, `reviews/${id}/feedback/${rk}`), { draft_enc: enc, draft_con: con });
+  const asvLbl = document.getElementById("asvLbl");
+  asvLbl.textContent = T[lang].asv;
+  asvLbl.classList.add("ok");
+  setTimeout(() => { asvLbl.classList.remove("ok"); }, 3000);
+}
+
+window.saveFeedback = async () => { await autoSave(curId); };
+
+// Submit modal
+window.openModal = () => {
+  if (!me || me === "Observer") return alert("Please select your reviewer identity first.");
+  document.getElementById("mBg").classList.add("on");
+};
+window.closeModal = () => { document.getElementById("mBg").classList.remove("on"); };
+window.confirmSub = async () => {
+  if (!me || !curId) return;
+  const rk = me.replace(/\s+/g,"_");
+  const enc = document.getElementById("taEnc").value;
+  const con = document.getElementById("taCon").value;
+  await update(ref(db, `reviews/${curId}/feedback/${rk}`), {
+    encouraging: enc, constructive: con, submitted: true,
+    submittedAt: Date.now(), reviewer: me
+  });
+  document.getElementById("mBg").classList.remove("on");
+  document.getElementById("subNote").classList.add("on");
+  document.getElementById("taEnc").disabled = true;
+  document.getElementById("taCon").disabled = true;
+  document.querySelector(".subbtn").style.display = "none";
+  document.querySelector(".svbtn").style.display = "none";
+};
+
+// Generate AI Report
+window.genReport = async (id) => {
+  const cd = snap[id] || {};
+  const c = CANDS.find(x => x.id === id);
+  const feedbacks = REVIEWERS.map(rv => {
+    const rk = rv.replace(/\s+/g,"_");
+    const fd = (cd.feedback && cd.feedback[rk]) || {};
+    if (!fd.submitted) return null;
+    return `${rv}: [Encouraging] ${fd.encouraging||""} [Constructive] ${fd.constructive||""}`;
+  }).filter(Boolean).join("\n\n");
+
+  try {
+    const prompt = `Based on the following reviewer feedback for BD candidate "${c.name}" applying for BDM promotion, write a concise bilingual summary report.
+
+Feedback:
+${feedbacks}
+
+Return a JSON object with:
+{
+  "en": "2-3 paragraph English summary highlighting key themes from all reviewers",
+  "pt": "Resumo em português de 2-3 parágrafos destacando os temas principais"
+}
+Return only valid JSON.`;
+
+    const body = { contents:[{ parts:[{ text: prompt }]}]};
+    const res = await fetch(GEMINI_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    const data = await res.json();
+    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+    const clean = raw.replace(/```json\n?/g,"").replace(/```\n?/g,"").trim();
+    let parsed;
+    try { parsed = JSON.parse(clean); } catch(e) { parsed = {en: raw, pt: raw}; }
+    await update(ref(db, `reviews/${id}`), { aiReport: parsed });
+  } catch(e) { alert("Report generation failed. Please try again."); }
+};
+
+// Init
+applyI18n();
+renderTable();
+</script>
+
+</body>
+</html>
