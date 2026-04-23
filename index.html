@@ -359,8 +359,6 @@ tbody tr:hover td:first-child{background:var(--hover);}
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-const AI_PROXY = "https://bdm-review.zhangwenele2026.workers.dev";
-
 async function callAI(prompt) {
   const res = await fetch(AI_PROXY, {
     method: "POST",
@@ -394,6 +392,38 @@ const CANDS = [
   {id:"sabrina", name:"Sabrina Fernandes", mis:"", time:"15:30–16:10"},
 ];
 const REVIEWERS = ["Eric Zhang","Ava Tian","James Feng","Daniel Albuquerque","Jay Lin"];
+const fbTransCache = {}; // key: `${candId}_${rk}_${lang}` → {enc, con}
+const AI_PROXY = "https://bdm-review.zhangwenele2026.workers.dev";
+
+async function translateText(text, targetLang) {
+  if (!text || !text.trim()) return text;
+  const tgtName = targetLang === "zh" ? "Simplified Chinese" : "Brazilian Portuguese";
+  try {
+    const res = await fetch(AI_PROXY, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: [
+          { role: "system", content: `Translate the following text to ${tgtName}. Output ONLY the translation. No explanation, no quotes.` },
+          { role: "user", content: text }
+        ]
+      })
+    });
+    const data = await res.json();
+    return data?.choices?.[0]?.message?.content?.trim() || text;
+  } catch(e) { return text; }
+}
+
+async function ensureFbTrans(candId, rk, enc, con, targetLang) {
+  const key = `${candId}_${rk}_${targetLang}`;
+  if (fbTransCache[key]) return fbTransCache[key];
+  const [tEnc, tCon] = await Promise.all([
+    translateText(enc, targetLang),
+    translateText(con, targetLang)
+  ]);
+  fbTransCache[key] = { enc: tEnc, con: tCon };
+  return fbTransCache[key];
+}
 
 const T = {
   en:{
@@ -535,10 +565,39 @@ function renderTable() {
       const rk = rv.replace(/\s+/g, "_");
       const fd = (cd.feedback && cd.feedback[rk]) || {};
       if (fd.submitted && (fd.encouraging || fd.constructive)) {
-        html += `<td class="fbc">
-          ${fd.encouraging ? `<div class="fb-card enc"><div class="fb-lbl enc">${T.en.encL}</div><div class="fb-txt">${fd.encouraging}</div></div>` : ""}
-          ${fd.constructive ? `<div class="fb-card con"><div class="fb-lbl con">${T.en.conL}</div><div class="fb-txt">${fd.constructive}</div></div>` : ""}
-        </td>`;
+        const cellId = `fbc_${c.id}_${rk}`;
+        const encL = T[lang].encL;
+        const conL = T[lang].conL;
+        if (lang === "en") {
+          html += `<td class="fbc" id="${cellId}">
+            ${fd.encouraging ? `<div class="fb-card enc"><div class="fb-lbl enc">${encL}</div><div class="fb-txt">${fd.encouraging}</div></div>` : ""}
+            ${fd.constructive ? `<div class="fb-card con"><div class="fb-lbl con">${conL}</div><div class="fb-txt">${fd.constructive}</div></div>` : ""}
+          </td>`;
+        } else {
+          // Check cache first
+          const ckey = `${c.id}_${rk}_${lang}`;
+          const cached = fbTransCache[ckey];
+          if (cached) {
+            html += `<td class="fbc" id="${cellId}">
+              ${cached.enc ? `<div class="fb-card enc"><div class="fb-lbl enc">${encL}</div><div class="fb-txt">${cached.enc}</div></div>` : ""}
+              ${cached.con ? `<div class="fb-card con"><div class="fb-lbl con">${conL}</div><div class="fb-txt">${cached.con}</div></div>` : ""}
+            </td>`;
+          } else {
+            // Show loading, then async translate
+            html += `<td class="fbc" id="${cellId}"><div class="fb-empty" style="color:#9CA3AF;font-style:italic">Translating…</div></td>`;
+            // Schedule async translate
+            (async () => {
+              const t = await ensureFbTrans(c.id, rk, fd.encouraging||"", fd.constructive||"", lang);
+              const cell = document.getElementById(cellId);
+              if (cell) {
+                cell.innerHTML = `
+                  ${t.enc ? `<div class="fb-card enc"><div class="fb-lbl enc">${encL}</div><div class="fb-txt">${t.enc}</div></div>` : ""}
+                  ${t.con ? `<div class="fb-card con"><div class="fb-lbl con">${conL}</div><div class="fb-txt">${t.con}</div></div>` : ""}
+                `;
+              }
+            })();
+          }
+        }
       } else {
         html += `<td class="fbc"><div class="fb-empty">—</div></td>`;
       }
