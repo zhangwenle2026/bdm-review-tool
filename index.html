@@ -245,9 +245,11 @@ tbody tr:hover td:first-child{background:var(--hover);}
             <textarea id="taCon" placeholder="What areas could be developed further?"></textarea>
           </div>
           <div class="asv" id="asvLbl"></div>
-          <button class="svbtn" onclick="saveFeedback()">💾 <span id="lblSave">Save</span></button>
-          <button class="subbtn" onclick="openModal()">✓ <span id="lblSub">Submit Feedback</span></button>
-          <div class="subnote" id="subNote">✓ Feedback submitted · 已提交反馈 <button onclick="unsubmitFeedback()" style="margin-left:10px;font-size:11px;background:none;border:1px solid #D1D5DB;border-radius:4px;padding:2px 8px;cursor:pointer;color:#6B7280;">Edit</button></div>
+          <div style="display:flex;gap:8px;margin-top:4px;">
+            <button class="subbtn" id="btnSubmit" onclick="confirmSub()">✓ <span id="lblSub">Submit</span></button>
+            <button class="svbtn" id="btnEdit" onclick="unsubmitFeedback()" style="display:none;">✎ <span id="lblEdit">Edit</span></button>
+          </div>
+          <div class="subnote" id="subNote"></div>
         </div>
         <div id="observerView" style="display:none;padding:20px;text-align:center;color:#6B7280;font-size:13px;">
           👁 Observer mode — read only<br>
@@ -415,7 +417,7 @@ window.onIdChange = v => {
 function renderTable() {
   const t = T[lang];
   document.getElementById("tHead").innerHTML =
-    [t.thName, t.thMis, t.thTime, t.thMat, t.thInfo, t.thEnt,
+    [t.thName, t.thMis, t.thTime, t.thMat, t.thEnt,
      ...REVIEWERS, t.thRpt].map(c => `<th>${c}</th>`).join("");
 
   const tbody = document.getElementById("tBody");
@@ -442,13 +444,6 @@ function renderTable() {
         ${fileB64 ? `✓ ${fileName||'File uploaded'}` : t.btnUp}
       </button>
     </td>`;
-    // Basic Info
-    if (basicInfo) {
-      const parts = basicInfo.split("|").filter(Boolean);
-      html += `<td><div class="ai-badge">✦ AI</div><div class="chips">${parts.map(p=>`<span class="chip">${p.trim()}</span>`).join("")}</div></td>`;
-    } else {
-      html += `<td><div class="chips"><span class="chip em">${fileB64?"analyzing…":"—"}</span></div></td>`;
-    }
     // Enter review
     html += `<td><button class="enbtn" onclick="openReview('${c.id}')">${t.btnEnt} →</button></td>`;
     // Reviewer columns
@@ -457,8 +452,8 @@ function renderTable() {
       const fd = (cd.feedback && cd.feedback[rk]) || {};
       if (fd.submitted && (fd.encouraging || fd.constructive)) {
         html += `<td class="fbc">
-          ${fd.encouraging ? `<div class="fb-card enc"><div class="fb-lbl enc">${t.encL}</div><div class="fb-txt">${fd.encouraging}</div></div>` : ""}
-          ${fd.constructive ? `<div class="fb-card con"><div class="fb-lbl con">${t.conL}</div><div class="fb-txt">${fd.constructive}</div></div>` : ""}
+          ${fd.encouraging ? `<div class="fb-card enc"><div class="fb-lbl enc">${T.en.encL}</div><div class="fb-txt">${fd.encouraging}</div></div>` : ""}
+          ${fd.constructive ? `<div class="fb-card con"><div class="fb-lbl con">${T.en.conL}</div><div class="fb-txt">${fd.constructive}</div></div>` : ""}
         </td>`;
       } else {
         html += `<td class="fbc"><div class="fb-empty">—</div></td>`;
@@ -712,11 +707,12 @@ function loadMyFeedback(id) {
   document.getElementById("taEnc").value = fd.encouraging || fd.draft_enc || "";
   document.getElementById("taCon").value = fd.constructive || fd.draft_con || "";
   const submitted = fd.submitted || false;
-  document.getElementById("taEnc").disabled = false;
-  document.getElementById("taCon").disabled = false;
-  document.getElementById("subNote").classList.toggle("on", submitted);
-  document.querySelector(".subbtn").style.display = "block";
-  document.querySelector(".svbtn").style.display = "block";
+  document.getElementById("taEnc").disabled = submitted;
+  document.getElementById("taCon").disabled = submitted;
+  const subNote = document.getElementById("subNote");
+  subNote.textContent = submitted ? (T[lang].subNote || "✓ Feedback submitted") : "";
+  document.getElementById("btnSubmit").style.display = submitted ? "none" : "block";
+  document.getElementById("btnEdit").style.display = submitted ? "block" : "none";
 
   // Auto-save
   const inputs = [document.getElementById("taEnc"), document.getElementById("taCon")];
@@ -752,7 +748,7 @@ window.openModal = () => {
 };
 window.closeModal = () => { document.getElementById("mBg").classList.remove("on"); };
 window.confirmSub = async () => {
-  if (!me || !curId) return;
+  if (!me || !curId || me === "Observer") return;
   const rk = me.replace(/\s+/g,"_");
   const enc = document.getElementById("taEnc").value;
   const con = document.getElementById("taCon").value;
@@ -760,8 +756,11 @@ window.confirmSub = async () => {
     encouraging: enc, constructive: con, submitted: true,
     submittedAt: Date.now(), reviewer: me
   });
-  document.getElementById("mBg").classList.remove("on");
-  document.getElementById("subNote").classList.add("on");
+  document.getElementById("taEnc").disabled = true;
+  document.getElementById("taCon").disabled = true;
+  document.getElementById("subNote").textContent = T[lang].subNote || "✓ Feedback submitted";
+  document.getElementById("btnSubmit").style.display = "none";
+  document.getElementById("btnEdit").style.display = "block";
 };
 
 // Generate AI Report
@@ -769,7 +768,11 @@ window.unsubmitFeedback = async () => {
   if (!me || !curId) return;
   const rk = me.replace(/\s+/g,"_");
   await update(ref(db, `reviews/${curId}/feedback/${rk}`), { submitted: false });
-  document.getElementById("subNote").classList.remove("on");
+  document.getElementById("taEnc").disabled = false;
+  document.getElementById("taCon").disabled = false;
+  document.getElementById("subNote").textContent = "";
+  document.getElementById("btnSubmit").style.display = "block";
+  document.getElementById("btnEdit").style.display = "none";
 };
 
 window.genReport = async (id) => {
