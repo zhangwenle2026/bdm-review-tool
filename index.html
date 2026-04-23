@@ -1053,12 +1053,20 @@ Return a JSON object with exactly this structure — three language keys (en, zh
     "con": "2-3 frases resumindo os pontos CONSTRUTIVOS de todos os avaliadores (áreas de melhoria)"
   }
 }
-Return only valid JSON, no markdown fences.`;
+IMPORTANT: Your entire response must be ONLY the JSON object. Do not include any explanatory text, greetings, or markdown. Start your response with { and end with }.`;
 
     const raw = await callAI(prompt);
-    const clean = raw.replace(/```json\n?/g,"").replace(/```\n?/g,"").trim();
+    // Extract JSON block even if AI adds surrounding text
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    const clean = jsonMatch ? jsonMatch[0] : raw;
     let parsed;
-    try { parsed = JSON.parse(clean); } catch(e) { parsed = {en: raw, pt: raw}; }
+    try {
+      parsed = JSON.parse(clean);
+      // Validate structure — must have enc/con inside at least one lang
+      if (!parsed.en || typeof parsed.en !== 'object') throw new Error('bad structure');
+    } catch(e) {
+      parsed = { en: {enc: raw, con: ""}, zh: {enc: raw, con: ""}, pt: {enc: raw, con: ""} };
+    }
     await update(ref(db, `reviews/${id}`), { aiReport: parsed });
   } catch(e) { alert("Report generation failed. Please try again."); }
 };
