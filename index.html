@@ -167,6 +167,16 @@ tbody tr:hover td:first-child{background:var(--hover);}
 .interp-toggle{background:rgba(139,92,246,.12);border:1px solid #7C3AED;color:#7C3AED;padding:5px 13px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:600;transition:all .15s;}
 .interp-toggle:hover,.interp-toggle.on{background:#7C3AED;color:#fff;}
 
+/* PDF fullscreen modal */
+#pdfModal{display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.85);align-items:center;justify-content:center;}
+#pdfModal.open{display:flex;}
+#pdfModal .pm-inner{position:relative;width:92vw;height:92vh;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.5);}
+#pdfModal iframe{width:100%;height:100%;border:none;display:block;}
+#pdfModal .pm-close{position:absolute;top:10px;right:12px;z-index:10;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:34px;height:34px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;}
+#pdfModal .pm-close:hover{background:rgba(0,0,0,.8);}
+.pdf-expand-btn{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.5);color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer;z-index:5;display:flex;align-items:center;gap:4px;}
+.pdf-expand-btn:hover{background:rgba(0,0,0,.75);}
+.ppt-wrap{position:relative;width:100%;height:100%;display:flex;flex-direction:column;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
@@ -678,7 +688,10 @@ window.openReview = id => {
       const blob = new Blob([byteArr], {type: "application/pdf"});
       const blobUrl = URL.createObjectURL(blob);
       _origPdfUrl = blobUrl;
-      pptArea.innerHTML = `<iframe src="${blobUrl}" width="100%" height="100%" style="border:none;border-radius:6px;display:block;min-height:600px;flex:1"></iframe>`;
+      pptArea.innerHTML = `<div class="ppt-wrap">
+        <button class="pdf-expand-btn" onclick="openPdfModal('${blobUrl}')">⛶ Expand</button>
+        <iframe src="${blobUrl}" width="100%" height="100%" style="border:none;border-radius:6px;display:block;min-height:600px;flex:1"></iframe>
+      </div>`;
     } else {
       pptArea.innerHTML = `<div style="padding:32px;text-align:center;color:#6B7280;font-size:13px">
         <div style="font-size:28px;margin-bottom:12px">📊</div>
@@ -744,7 +757,7 @@ function restoreOriginalPdf() {
   if (!cd.fileBase64) return;
   const pptArea = document.getElementById("pptArea");
   if (_origPdfUrl) {
-    pptArea.innerHTML = `<iframe src="${_origPdfUrl}" width="100%" height="100%" style="border:none;border-radius:6px;display:block;min-height:600px;flex:1"></iframe>`;
+    pptArea.innerHTML = `<div class="ppt-wrap"><button class="pdf-expand-btn" onclick="openPdfModal('${_origPdfUrl}')">⛶ Expand</button><iframe src="${_origPdfUrl}" width="100%" height="100%" style="border:none;border-radius:6px;display:block;min-height:600px;flex:1"></iframe></div>`;
   } else {
     // Rebuild blob URL
     const isPdf = (cd.fileType || "application/pdf").includes("pdf");
@@ -754,7 +767,7 @@ function restoreOriginalPdf() {
       for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
       const blob = new Blob([byteArr], {type: "application/pdf"});
       _origPdfUrl = URL.createObjectURL(blob);
-      pptArea.innerHTML = `<iframe src="${_origPdfUrl}" width="100%" height="100%" style="border:none;border-radius:6px;display:block;min-height:600px;flex:1"></iframe>`;
+      pptArea.innerHTML = `<div class="ppt-wrap"><button class="pdf-expand-btn" onclick="openPdfModal('${_origPdfUrl}')">⛶ Expand</button><iframe src="${_origPdfUrl}" width="100%" height="100%" style="border:none;border-radius:6px;display:block;min-height:600px;flex:1"></iframe></div>`;
     }
   }
 }
@@ -1317,7 +1330,34 @@ async function translateAndShow(text, tgtLang, transEl) {
   });
 })();
 // ── End Live Interpreter ───────────────────────────────────────
+
+// ── PDF Fullscreen Modal ──────────────────────────────────────
+window.openPdfModal = (url) => {
+  document.getElementById("pdfModalFrame").src = url;
+  document.getElementById("pdfModal").classList.add("open");
+  document.body.style.overflow = "hidden";
+};
+window.closePdfModal = () => {
+  document.getElementById("pdfModal").classList.remove("open");
+  document.getElementById("pdfModalFrame").src = "";
+  document.body.style.overflow = "";
+};
+// Close on backdrop click
+document.getElementById("pdfModal").addEventListener("click", e => {
+  if (e.target === document.getElementById("pdfModal")) closePdfModal();
+});
+// Close on Escape key
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") closePdfModal();
+});
 </script>
 
+<!-- PDF Fullscreen Modal -->
+<div id="pdfModal">
+  <div class="pm-inner">
+    <button class="pm-close" onclick="closePdfModal()" title="Close">✕</button>
+    <iframe id="pdfModalFrame" src="" allowfullscreen></iframe>
+  </div>
+</div>
 </body>
 </html>
