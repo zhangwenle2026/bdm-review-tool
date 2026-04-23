@@ -98,6 +98,19 @@ td{padding:13px 16px;font-size:13px;vertical-align:top;}
 .subnote.on{display:block;}
 .mbg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:400;align-items:center;justify-content:center;}
 .mbg.on{display:flex;}
+.id-gate{position:fixed;inset:0;background:rgba(15,20,30,.55);z-index:300;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);}
+.id-gate.off{display:none;}
+.id-gate-box{background:var(--card);border:1px solid var(--bdr);border-radius:14px;padding:36px 40px;text-align:center;max-width:400px;width:90%;box-shadow:0 12px 40px rgba(0,0,0,.18);}
+.id-gate-box .icon{font-size:36px;margin-bottom:14px;}
+.id-gate-box h2{font-size:17px;font-weight:700;margin-bottom:8px;}
+.id-gate-box p{color:var(--muted);font-size:13px;line-height:1.6;margin-bottom:22px;}
+.id-gate-box select{width:100%;background:var(--inp);border:1.5px solid var(--bdr);color:var(--txt);padding:9px 14px;border-radius:8px;font-size:14px;margin-bottom:14px;cursor:pointer;}
+.id-gate-box select:focus{outline:none;border-color:var(--acc);}
+.id-gate-btn{width:100%;padding:11px;background:var(--acc);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;}
+.id-gate-btn:hover{background:#2563EB;transform:translateY(-1px);}
+.id-gate-btn:disabled{background:#D1D5DB;cursor:not-allowed;transform:none;}
+.idbar-hint{background:#FFF7ED;border:1px solid #FED7AA;color:#92400E;padding:6px 14px;border-radius:6px;font-size:12px;display:none;}
+.idbar-hint.on{display:inline-block;}
 .mbox{background:var(--card);border:1px solid var(--bdr);border-radius:12px;padding:32px;max-width:420px;width:90%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.12);}
 .mbox h3{font-size:17px;font-weight:600;margin-bottom:10px;}.mbox p{color:var(--muted);font-size:13px;line-height:1.6;margin-bottom:24px;}
 .mbtns{display:flex;gap:10px;justify-content:center;}
@@ -112,6 +125,24 @@ td{padding:13px 16px;font-size:13px;vertical-align:top;}
 </style>
 </head>
 <body>
+<div class="id-gate" id="idGate">
+  <div class="id-gate-box">
+    <div class="icon">👤</div>
+    <h2 id="gateTitle">Who are you?</h2>
+    <p id="gateMsg">Please select your reviewer identity before entering the workbench.</p>
+    <select id="gateSel" onchange="document.getElementById('gateBtn').disabled=!this.value">
+      <option value="">— Select identity —</option>
+      <option value="Eric Zhang">Eric Zhang</option>
+      <option value="Ava Tian">Ava Tian</option>
+      <option value="James Feng">James Feng</option>
+      <option value="Daniel Albuquerque">Daniel Albuquerque</option>
+      <option value="Jay Lin">Jay Lin</option>
+      <option value="Observer">Observer / HR (旁听)</option>
+    </select>
+    <button class="id-gate-btn" id="gateBtn" disabled onclick="confirmGate()">Enter Workbench →</button>
+  </div>
+</div>
+
 <header class="hdr">
   <div class="logo">
     <span class="logo-badge">KEETA</span>
@@ -333,6 +364,11 @@ window.setLang = (l, btn) => {
 
 function applyI18n() {
   const t = T[lang];
+  // Gate texts
+  const gateTitles = {en:"Who are you?", zh:"请选择你的身份", pt:"Quem é você?"};
+  const gateMsgs = {en:"Please select your reviewer identity before entering the workbench.", zh:"请先选择评委身份，再进入评审工作台。", pt:"Selecione sua identidade antes de entrar."};
+  const gateTitle = document.getElementById("gateTitle"); if(gateTitle) gateTitle.textContent = gateTitles[lang];
+  const gateMsg = document.getElementById("gateMsg"); if(gateMsg) gateMsg.textContent = gateMsgs[lang];
   const map = [
     ["hTitle","hTitle"],["hSub","hSub"],["lblId","lblId"],["lblSec","lblSec"],
     ["lblPPT","lblPPT"],["lblAI","lblAI"],["lblFB","lblFB"],
@@ -460,6 +496,10 @@ Only return the pipe-separated line, nothing else.`;
 
 // Open review
 window.openReview = id => {
+  if (!me) {
+    document.getElementById("idGate").classList.remove("off");
+    return;
+  }
   curId = id;
   const c = CANDS.find(x => x.id === id);
   const cd = snap[id] || {};
@@ -704,6 +744,22 @@ Return only valid JSON.`;
     try { parsed = JSON.parse(clean); } catch(e) { parsed = {en: raw, pt: raw}; }
     await update(ref(db, `reviews/${id}`), { aiReport: parsed });
   } catch(e) { alert("Report generation failed. Please try again."); }
+};
+
+// Identity gate
+window.confirmGate = () => {
+  const v = document.getElementById("gateSel").value;
+  if (!v) return;
+  me = v;
+  document.getElementById("idGate").classList.add("off");
+  // Sync to top bar
+  document.getElementById("idSel").value = v;
+  const b = document.getElementById("idBadge");
+  b.textContent = v;
+  b.classList.add("on");
+  const rn = document.getElementById("reviewerName");
+  rn.textContent = v;
+  rn.dataset.live = "1";
 };
 
 // Init
