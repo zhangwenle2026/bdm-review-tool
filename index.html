@@ -26,7 +26,7 @@ body{font-family:-apple-system,'Segoe UI',system-ui,sans-serif;background:var(--
 .tw{overflow-x:auto;background:var(--card);border:1px solid var(--bdr);border-radius:10px;box-shadow:var(--shadow);}
 table{width:100%;border-collapse:collapse;min-width:1700px;}
 thead{border-bottom:1px solid var(--bdr);}
-th{padding:10px 16px;text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);white-space:nowrap;background:var(--card);}
+th{padding:10px 16px;text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);white-space:nowrap;background:var(--card);position:sticky;top:0;z-index:10;box-shadow:0 1px 0 var(--bdr);}
 tbody tr{border-bottom:1px solid var(--bdr);transition:background .15s ease;}
 tbody tr:last-child{border-bottom:none;}
 tbody tr:hover{background:var(--hover);}
@@ -262,7 +262,7 @@ td{padding:13px 16px;font-size:13px;vertical-align:top;}
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-const GEMINI_KEY = "AIzaSyCWDRZCir7IG4raqvvYCnT9AwG2BXUvbDE";
+const GEMINI_KEY = "AIzaSyCvjLrGGhz-31RPSicD4piMBQ5JP_G52_U";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`;
 
 const fbApp = initializeApp({
@@ -478,22 +478,27 @@ window.uploadFile = async (id, input) => {
 
 async function extractBasicInfo(id, b64, mime) {
   try {
-    // Step 1: extract text
+    // Step 1: extract raw text from document
     const rawText = await extractTextFromFile(b64, mime);
-    if (!rawText) return;
-    // Step 2: ask Gemini to parse basic info from text
-    const prompt = `From this BD candidate's presentation text, extract basic personal info in this exact format (pipe-separated, no explanation):
-[Name] | [Education level] | [Years of BD experience] | [City/Region]
-Only return the pipe-separated line, nothing else.
+    if (!rawText || rawText.length < 10) {
+      console.warn("extractBasicInfo: no text extracted");
+      return;
+    }
+    // Step 2: parse structured info from text only (no inline_data)
+    const prompt = `From the following BD candidate presentation text, extract basic personal info.
+Return ONLY a single pipe-separated line in this format (no explanation, no extra text):
+[Candidate Name] | [Education] | [Years BD experience] | [City/Region]
 
-Text:
+Presentation text:
 ${rawText.slice(0, 3000)}`;
     const body = { contents:[{ parts:[{ text: prompt }]}]};
     const res = await fetch(GEMINI_URL, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)});
     const data = await res.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    if (data.error) { console.warn("basicInfo Gemini error:", data.error.message); return; }
+    const text = (data.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
     if (text.includes("|")) {
-      await update(ref(db, `reviews/${id}`), { basicInfo: text.trim() });
+      await update(ref(db, `reviews/${id}`), { basicInfo: text });
+      console.log("basicInfo saved:", text);
     }
   } catch(e) { console.warn("basicInfo extraction failed", e); }
 }
