@@ -130,6 +130,8 @@ tbody tr:hover td:first-child{background:var(--hover);}
 /* ── Live Interpreter ── */
 .interp-panel{position:fixed;bottom:0;left:0;right:0;z-index:500;background:rgba(15,20,30,.92);backdrop-filter:blur(12px);border-top:1px solid rgba(255,255,255,.1);display:none;flex-direction:column;}
 .interp-panel.on{display:flex;}
+.interp-resize-bar{height:6px;cursor:ns-resize;background:rgba(255,255,255,.06);flex-shrink:0;transition:background .15s;}
+.interp-resize-bar:hover{background:rgba(255,255,255,.18);}
 .interp-bar{display:flex;align-items:center;gap:10px;padding:10px 20px;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0;}
 .interp-bar h4{font-size:12px;font-weight:700;color:#fff;letter-spacing:.5px;text-transform:uppercase;flex:1;}
 .interp-ctrl{display:flex;align-items:center;gap:8px;}
@@ -301,6 +303,7 @@ tbody tr:hover td:first-child{background:var(--hover);}
 
 <!-- Live Interpreter Panel -->
 <div class="interp-panel" id="interpPanel">
+  <div class="interp-resize-bar" id="interpResizeBar"></div>
   <div class="interp-bar">
     <h4>🎙 Live Interpreter</h4>
     <div class="interp-ctrl">
@@ -970,6 +973,30 @@ renderTable();
 let _recognition = null;
 let _listening = false;
 let _subtitleTimer = null;
+
+// ── Interp panel vertical resize ─────────────────────────────
+(function() {
+  const bar   = document.getElementById("interpResizeBar");
+  const panel = document.getElementById("interpPanel");
+  let resizing = false, startY, startH;
+  bar.addEventListener("mousedown", e => {
+    resizing = true;
+    startY = e.clientY;
+    startH = panel.getBoundingClientRect().height;
+    document.body.style.userSelect = "none";
+    e.preventDefault();
+  });
+  document.addEventListener("mousemove", e => {
+    if (!resizing) return;
+    const delta = startY - e.clientY; // drag up = bigger
+    const newH  = Math.max(80, Math.min(window.innerHeight * 0.6, startH + delta));
+    panel.style.height = newH + "px";
+  });
+  document.addEventListener("mouseup", () => {
+    resizing = false;
+    document.body.style.userSelect = "";
+  });
+})();
 
 // ── Subtitle show/hide toggle ─────────────────────────────────
 let _subtitleVisible = true;
