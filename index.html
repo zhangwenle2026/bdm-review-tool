@@ -312,6 +312,7 @@ tbody tr:hover td:first-child{background:var(--hover);}
       </select>
       <button class="interp-start-btn idle" id="interpStartBtn" onclick="toggleListening()">▶ Start</button>
       <button class="interp-collapse-btn" id="interpCollapseBtn" onclick="toggleInterpCollapse()" title="Hide/Show panel">－</button>
+      <button class="interp-collapse-btn" id="subtitleToggleBtn" onclick="toggleSubtitle()" title="Show/Hide floating subtitle">🗨 Subtitle: ON</button>
       <button class="interp-close-btn" onclick="toggleInterp()">✕ Close</button>
     </div>
   </div>
@@ -964,6 +965,21 @@ let _recognition = null;
 let _listening = false;
 let _subtitleTimer = null;
 
+// ── Subtitle show/hide toggle ─────────────────────────────────
+let _subtitleVisible = true;
+window.toggleSubtitle = () => {
+  const sub = document.getElementById("subtitleOverlay");
+  const btn = document.getElementById("subtitleToggleBtn");
+  _subtitleVisible = !_subtitleVisible;
+  if (_subtitleVisible) {
+    sub.classList.add("on");
+    btn.textContent = "🗨 Subtitle: ON";
+  } else {
+    sub.classList.remove("on");
+    btn.textContent = "🗨 Subtitle: OFF";
+  }
+};
+
 // ── Collapse/expand interp body ───────────────────────────────
 window.toggleInterpCollapse = () => {
   const panel = document.getElementById("interpPanel");
@@ -991,10 +1007,11 @@ window.toggleInterp = () => {
     btn.classList.remove("on");
   } else {
     panel.classList.add("on");
-    sub.classList.add("on");
+    if (_subtitleVisible) sub.classList.add("on");
     btn.classList.add("on");
-    // reset collapse btn
+    // reset collapse btn + subtitle btn
     document.getElementById("interpCollapseBtn").textContent = "－";
+    document.getElementById("subtitleToggleBtn").textContent = _subtitleVisible ? "🗨 Subtitle: ON" : "🗨 Subtitle: OFF";
   }
 };
 
