@@ -45,7 +45,7 @@ tbody tr:hover td:first-child{background:var(--hover);}
 .ai-badge{display:inline-flex;align-items:center;gap:3px;background:#F3F4F6;border:1px solid var(--bdr);color:var(--muted);padding:1px 6px;border-radius:3px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
 .enbtn{border:1px solid var(--acc);background:transparent;color:var(--acc);padding:7px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:500;white-space:nowrap;transition:all .2s ease;}
 .enbtn:hover{background:var(--acc);color:#fff;transform:translateY(-1px);box-shadow:0 2px 8px rgba(59,130,246,.25);}
-.fbc{min-width:160px;max-width:190px;max-height:150px;overflow-y:auto;vertical-align:top;}
+.fbc{min-width:160px;max-width:190px;vertical-align:top;padding:4px!important;}.fbc-scroll{max-height:150px;overflow-y:auto;}
 .fb-card{border-radius:6px;padding:8px 10px;margin-bottom:6px;border:1px solid;}
 .fb-card.enc{background:var(--enc-bg);border-color:var(--enc-bdr);}
 .fb-card.con{background:var(--con-bg);border-color:var(--con-bdr);}
@@ -574,9 +574,10 @@ function renderTable() {
         // All languages: check translation cache; EN skips AI call only if text is already English
         const ckey = `${c.id}_${rk}_${lang}`;
         const cached = fbTransCache[ckey];
-        const fbCardHtml = (e, co) => `
+        const fbCardHtml = (e, co) => `<div class="fbc-scroll">
             ${e ? `<div class="fb-card enc"><div class="fb-lbl enc">${encL}</div><div class="fb-txt">${e}</div></div>` : ""}
-            ${co ? `<div class="fb-card con"><div class="fb-lbl con">${conL}</div><div class="fb-txt">${co}</div></div>` : ""}`;
+            ${co ? `<div class="fb-card con"><div class="fb-lbl con">${conL}</div><div class="fb-txt">${co}</div></div>` : ""}
+          </div>`;
         if (cached) {
           html += `<td class="fbc" id="${cellId}">${fbCardHtml(cached.enc, cached.con)}</td>`;
         } else {
