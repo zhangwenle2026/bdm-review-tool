@@ -359,6 +359,8 @@ tbody tr:hover td:first-child{background:var(--hover);}
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
+const AI_PROXY = "https://bdm-review.zhangwenele2026.workers.dev";
+
 async function callAI(prompt) {
   const res = await fetch(AI_PROXY, {
     method: "POST",
@@ -393,7 +395,6 @@ const CANDS = [
 ];
 const REVIEWERS = ["Eric Zhang","Ava Tian","James Feng","Daniel Albuquerque","Jay Lin"];
 const fbTransCache = {}; // key: `${candId}_${rk}_${lang}` → {enc, con}
-const AI_PROXY = "https://bdm-review.zhangwenele2026.workers.dev";
 
 async function translateText(text, targetLang) {
   if (!text || !text.trim()) return text;
@@ -587,12 +588,21 @@ function renderTable() {
             html += `<td class="fbc" id="${cellId}"><div class="fb-empty" style="color:#9CA3AF;font-style:italic">Translating…</div></td>`;
             // Schedule async translate
             (async () => {
-              const t = await ensureFbTrans(c.id, rk, fd.encouraging||"", fd.constructive||"", lang);
-              const cell = document.getElementById(cellId);
-              if (cell) {
-                cell.innerHTML = `
-                  ${t.enc ? `<div class="fb-card enc"><div class="fb-lbl enc">${encL}</div><div class="fb-txt">${t.enc}</div></div>` : ""}
-                  ${t.con ? `<div class="fb-card con"><div class="fb-lbl con">${conL}</div><div class="fb-txt">${t.con}</div></div>` : ""}
+              try {
+                const t = await ensureFbTrans(c.id, rk, fd.encouraging||"", fd.constructive||"", lang);
+                const cell = document.getElementById(cellId);
+                if (cell) {
+                  cell.innerHTML = `
+                    ${t.enc ? `<div class="fb-card enc"><div class="fb-lbl enc">${encL}</div><div class="fb-txt">${t.enc}</div></div>` : ""}
+                    ${t.con ? `<div class="fb-card con"><div class="fb-lbl con">${conL}</div><div class="fb-txt">${t.con}</div></div>` : ""}
+                  `;
+                }
+              } catch(e) {
+                console.warn("fb translate error", e);
+                const cell = document.getElementById(cellId);
+                if (cell) cell.innerHTML = `
+                  ${fd.encouraging ? `<div class="fb-card enc"><div class="fb-lbl enc">${encL}</div><div class="fb-txt">${fd.encouraging}</div></div>` : ""}
+                  ${fd.constructive ? `<div class="fb-card con"><div class="fb-lbl con">${conL}</div><div class="fb-txt">${fd.constructive}</div></div>` : ""}
                 `;
               }
             })();
