@@ -206,9 +206,9 @@ tbody tr:hover td:first-child{background:var(--hover);}
       <div class="rch">
         <span id="lblPPT">📄 Presentation</span>
         <div class="tbtns">
-          <button class="tbtn on" onclick="transLang('en',this)">EN</button>
-          <button class="tbtn" onclick="transLang('zh',this)">中</button>
-          <button class="tbtn" onclick="transLang('pt',this)">PT</button>
+          <button class="tbtn on" id="tbEN" onclick="transLang('en',this)">EN</button>
+          <button class="tbtn" id="tbZH" onclick="transLang('zh',this)">中</button>
+          <button class="tbtn" id="tbPT" onclick="transLang('pt',this)">PT</button>
         </div>
       </div>
       <div class="rcb">
@@ -537,6 +537,7 @@ window.openReview = id => {
       for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
       const blob = new Blob([byteArr], {type: "application/pdf"});
       const blobUrl = URL.createObjectURL(blob);
+      _origPdfUrl = blobUrl;
       pptArea.innerHTML = `<iframe src="${blobUrl}" width="100%" height="100%" style="border:none;border-radius:6px;display:block;min-height:600px;flex:1"></iframe>`;
     } else {
       pptArea.innerHTML = `<div style="padding:32px;text-align:center;color:#6B7280;font-size:13px">
@@ -569,35 +570,74 @@ window.closeReview = () => {
   document.getElementById("rov").classList.remove("on");
   document.body.style.overflow = "";
   curId = "";
+  _origPdfUrl = null;
+  // Reset language tabs to EN
+  document.querySelectorAll(".tbtn").forEach(b => b.classList.remove("on"));
+  const tbEN = document.getElementById("tbEN");
+  if (tbEN) tbEN.classList.add("on");
 };
 
 // Translation
+// Store original PDF blob URL so we can restore it
+let _origPdfUrl = null;
+
 window.transLang = (l, btn) => {
   document.querySelectorAll(".tbtn").forEach(b => b.classList.remove("on"));
   if (btn) btn.classList.add("on");
   const cd = snap[curId] || {};
   if (!cd.fileBase64) return;
   if (l === "en") {
-    // Re-render original or re-run
-    genTranslation(curId, l);
+    restoreOriginalPdf();
   } else {
     genTranslation(curId, l);
   }
 };
 
+function restoreOriginalPdf() {
+  const cd = snap[curId] || {};
+  if (!cd.fileBase64) return;
+  const pptArea = document.getElementById("pptArea");
+  if (_origPdfUrl) {
+    pptArea.innerHTML = `<iframe src="${_origPdfUrl}" width="100%" height="100%" style="border:none;border-radius:6px;display:block;min-height:600px;flex:1"></iframe>`;
+  } else {
+    // Rebuild blob URL
+    const isPdf = (cd.fileType || "application/pdf").includes("pdf");
+    if (isPdf) {
+      const byteChars = atob(cd.fileBase64);
+      const byteArr = new Uint8Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
+      const blob = new Blob([byteArr], {type: "application/pdf"});
+      _origPdfUrl = URL.createObjectURL(blob);
+      pptArea.innerHTML = `<iframe src="${_origPdfUrl}" width="100%" height="100%" style="border:none;border-radius:6px;display:block;min-height:600px;flex:1"></iframe>`;
+    }
+  }
+}
+
 async function genTranslation(id, targetLang) {
   const cd = snap[id] || {};
   if (!cd.fileBase64) return;
   const pptArea = document.getElementById("pptArea");
-  pptArea.innerHTML = `<div class="spin"></div> Translating…`;
+  pptArea.innerHTML = `<div style="padding:20px;color:#6B7280;font-size:13px"><span class="spin"></span> Translating…</div>`;
   try {
-    const langMap = { en:"English", zh:"Chinese (Simplified)", pt:"Brazilian Portuguese" };
+    const langMap = { zh:"Chinese (Simplified)", pt:"Brazilian Portuguese" };
     const rawText = await extractTextFromFile(cd.fileBase64, cd.fileType||"application/pdf");
-    const prompt = `Translate the following presentation content into ${langMap[targetLang]}. Format as clean readable text preserving slide structure. Do not add commentary.\n\n${rawText.slice(0,6000)}`;
+    const prompt = `Translate the following presentation content into ${langMap[targetLang]}. Preserve slide structure using clear section headers (e.g. [Slide 1]). Format as clean, readable paragraphs. Do not add commentary.\n\n${rawText.slice(0,6000)}`;
     const text = await callAI(prompt);
-    pptArea.innerHTML = `<div style="background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:20px;font-size:13px;line-height:1.8;white-space:pre-wrap;text-align:left;width:100%">${text}</div>`;
+    pptArea.innerHTML = `
+      <div style="display:flex;flex-direction:column;height:100%;min-height:600px;">
+        <div style="padding:8px 12px;background:#F3F4F6;border-bottom:1px solid #E5E7EB;display:flex;align-items:center;gap:8px;flex-shrink:0;">
+          <button onclick="restoreOriginalPdf();document.querySelectorAll('.tbtn').forEach(b=>b.classList.remove('on'));document.getElementById('tbEN').classList.add('on');"
+            style="font-size:11px;background:#fff;border:1px solid #D1D5DB;border-radius:5px;padding:3px 10px;cursor:pointer;color:#374151;display:flex;align-items:center;gap:4px;">
+            ← Show Original PDF
+          </button>
+          <span style="font-size:11px;color:#9CA3AF;">${langMap[targetLang]} translation</span>
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:20px;background:#fff;border-radius:0 0 8px 8px;">
+          <div style="font-size:13px;line-height:1.9;white-space:pre-wrap;color:#1F2329;">${text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+        </div>
+      </div>`;
   } catch(e) {
-    pptArea.innerHTML = `<div style="color:#EF4444;font-size:13px">Translation failed. Please try again.</div>`;
+    pptArea.innerHTML = `<div style="padding:20px;color:#EF4444;font-size:13px">Translation failed: ${e.message||"Please try again."}</div>`;
   }
 }
 
