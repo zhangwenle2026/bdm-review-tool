@@ -57,7 +57,7 @@ tbody tr:hover td:first-child{background:var(--hover);}
 .rptbtn:hover{background:#7C3AED;color:#fff;transform:translateY(-1px);}
 .rptbtn:disabled{opacity:.4;cursor:not-allowed;transform:none;}
 .rpt-content{margin-top:8px;font-size:11px;line-height:1.6;}
-.rpt-en{color:#4C1D95;margin-bottom:6px;}.rpt-pt{color:#7C2D12;}
+.rpt-content{color:#4C1D95;}
 .rov{display:none;position:fixed;inset:0;background:var(--bg);z-index:200;flex-direction:column;}
 .rov.entering{opacity:0;transform:translateX(20px);}
 .rov.on{display:flex;animation:rovIn .25s ease forwards;}
@@ -613,7 +613,7 @@ function renderTable() {
     if (aiReport) {
       html += `<td style="min-width:180px;max-width:220px">
         <div class="ai-badge">✦ AI</div>
-        <div class="rpt-content"><div class="rpt-en">${aiReport.en||""}</div><div class="rpt-pt">${aiReport.pt||""}</div></div>
+        <div class="rpt-content">${aiReport[lang] || aiReport.en || ""}</div>
       </td>`;
     } else {
       const allSubmitted = REVIEWERS.every(rv => {
@@ -1003,12 +1003,13 @@ window.genReport = async (id) => {
 Feedback:
 ${feedbacks}
 
-Return a JSON object with:
+Return a JSON object with exactly these three keys:
 {
   "en": "2-3 paragraph English summary highlighting key themes from all reviewers",
+  "zh": "2-3段中文总结，提炼所有评委的核心观点",
   "pt": "Resumo em português de 2-3 parágrafos destacando os temas principais"
 }
-Return only valid JSON.`;
+Return only valid JSON, no markdown fences.`;
 
     const raw = await callAI(prompt);
     const clean = raw.replace(/```json\n?/g,"").replace(/```\n?/g,"").trim();
