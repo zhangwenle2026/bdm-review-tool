@@ -146,10 +146,14 @@ tbody tr:hover td:first-child{background:var(--hover);}
 .interp-orig{font-size:13px;color:rgba(255,255,255,.75);line-height:1.6;}
 .interp-trans{font-size:14px;color:#fff;font-weight:500;line-height:1.6;}
 .interp-interim{color:rgba(255,255,255,.4);font-style:italic;}
-/* Floating subtitle overlay */
-.subtitle-overlay{position:fixed;bottom:220px;left:50%;transform:translateX(-50%);z-index:600;max-width:800px;width:90%;pointer-events:none;display:none;}
+/* Floating subtitle overlay — draggable */
+.subtitle-overlay{position:fixed;bottom:220px;left:50%;transform:translateX(-50%);z-index:600;max-width:800px;width:90%;display:none;cursor:grab;}
 .subtitle-overlay.on{display:block;}
-.subtitle-box{background:rgba(0,0,0,.8);color:#fff;font-size:18px;font-weight:500;line-height:1.5;padding:12px 24px;border-radius:10px;text-align:center;backdrop-filter:blur(4px);}
+.subtitle-overlay.dragging{cursor:grabbing;}
+.subtitle-box{background:rgba(0,0,0,.8);color:#fff;font-size:18px;font-weight:500;line-height:1.5;padding:12px 24px;border-radius:10px;text-align:center;backdrop-filter:blur(4px);user-select:none;}
+/* interp body collapse */
+.interp-panel.collapsed .interp-body{display:none;}
+.interp-collapse-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;padding:5px 10px;border-radius:5px;font-size:13px;cursor:pointer;line-height:1;}
 /* Interp toggle button in rtop */
 .interp-toggle{background:rgba(139,92,246,.12);border:1px solid #7C3AED;color:#7C3AED;padding:5px 13px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:600;transition:all .15s;}
 .interp-toggle:hover,.interp-toggle.on{background:#7C3AED;color:#fff;}
@@ -303,6 +307,7 @@ tbody tr:hover td:first-child{background:var(--hover);}
         <option value="zh">中文</option>
       </select>
       <button class="interp-start-btn idle" id="interpStartBtn" onclick="toggleListening()">▶ Start</button>
+      <button class="interp-collapse-btn" id="interpCollapseBtn" onclick="toggleInterpCollapse()" title="Hide/Show panel">－</button>
       <button class="interp-close-btn" onclick="toggleInterp()">✕ Close</button>
     </div>
   </div>
@@ -950,25 +955,40 @@ renderTable();
 
 // ── Live Interpreter ──────────────────────────────────────────
 let _recognition = null;
-let _interpActive = false;
 let _listening = false;
 let _subtitleTimer = null;
-let _translateDebounce = null;
+
+// ── Collapse/expand interp body ───────────────────────────────
+window.toggleInterpCollapse = () => {
+  const panel = document.getElementById("interpPanel");
+  const btn = document.getElementById("interpCollapseBtn");
+  if (panel.classList.contains("collapsed")) {
+    panel.classList.remove("collapsed");
+    btn.textContent = "－";
+    btn.title = "Hide panel";
+  } else {
+    panel.classList.add("collapsed");
+    btn.textContent = "＋";
+    btn.title = "Show panel";
+  }
+};
 
 window.toggleInterp = () => {
   const panel = document.getElementById("interpPanel");
   const btn = document.getElementById("interpToggle");
   const sub = document.getElementById("subtitleOverlay");
   if (panel.classList.contains("on")) {
-    // Close
     stopListening();
     panel.classList.remove("on");
+    panel.classList.remove("collapsed");
     sub.classList.remove("on");
     btn.classList.remove("on");
   } else {
     panel.classList.add("on");
     sub.classList.add("on");
     btn.classList.add("on");
+    // reset collapse btn
+    document.getElementById("interpCollapseBtn").textContent = "－";
   }
 };
 
@@ -1006,26 +1026,22 @@ function startListening() {
     }
     const origEl = document.getElementById("interpOrig");
     if (final) {
-      origEl.innerHTML += `<span>${final} </span>`;
+      const existing = Array.from(origEl.querySelectorAll("span:not(.interp-interim)")).map(s => s.outerHTML).join("");
+      origEl.innerHTML = existing + `<span>${final} </span>`;
       origEl.scrollTop = origEl.scrollHeight;
       translateChunk(final);
     } else if (interim) {
-      // Show interim in grey
-      const existing = origEl.querySelectorAll("span:not(.interim)");
-      let existingText = Array.from(existing).map(s => s.textContent).join("");
-      origEl.innerHTML = Array.from(existing).map(s => s.outerHTML).join("") +
-        `<span class="interp-interim">${interim}</span>`;
+      const existing = Array.from(origEl.querySelectorAll("span:not(.interp-interim)")).map(s => s.outerHTML).join("");
+      origEl.innerHTML = existing + `<span class="interp-interim">${interim}</span>`;
     }
   };
 
   _recognition.onerror = (e) => {
-    if (e.error !== "no-speech" && e.error !== "aborted") {
-      console.warn("Speech error:", e.error);
-    }
+    if (e.error !== "no-speech" && e.error !== "aborted") console.warn("Speech error:", e.error);
   };
 
   _recognition.onend = () => {
-    if (_listening) _recognition.start(); // auto-restart
+    if (_listening) _recognition.start();
   };
 
   _recognition.start();
@@ -1039,22 +1055,57 @@ function stopListening() {
   btn.className = "interp-start-btn idle";
 }
 
+// Google Translate — fast, free, no key needed
 async function translateChunk(text) {
   if (!text.trim()) return;
-  const tgtLang = document.getElementById("interpTgtLang").value;
-  const langName = tgtLang === "zh" ? "Chinese (Simplified)" : "English";
+  const tgtLang = document.getElementById("interpTgtLang").value; // "en" or "zh"
+  const gtLang = tgtLang === "zh" ? "zh-CN" : "en";
   try {
-    const result = await callAI(`Translate to ${langName}. Output ONLY the translation, nothing else:\n\n${text}`);
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${gtLang}&dt=t&q=${encodeURIComponent(text)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    // data[0] is array of [translated, original] pairs
+    const translated = data[0].map(item => item[0]).join("").trim();
+    if (!translated) return;
     const transEl = document.getElementById("interpTrans");
-    transEl.innerHTML += `<span>${result.trim()} </span>`;
+    transEl.innerHTML += `<span>${translated} </span>`;
     transEl.scrollTop = transEl.scrollHeight;
-    // Update floating subtitle
     const subBox = document.getElementById("subtitleBox");
-    subBox.textContent = result.trim();
+    subBox.textContent = translated;
     clearTimeout(_subtitleTimer);
     _subtitleTimer = setTimeout(() => { subBox.textContent = ""; }, 8000);
   } catch(e) { console.warn("translate error", e); }
 }
+
+// ── Draggable subtitle overlay ────────────────────────────────
+(function() {
+  let dragEl, startX, startY, origLeft, origTop, isDragging = false;
+  document.addEventListener("mousedown", e => {
+    const el = e.target.closest(".subtitle-overlay");
+    if (!el) return;
+    dragEl = el;
+    isDragging = true;
+    dragEl.classList.add("dragging");
+    const rect = dragEl.getBoundingClientRect();
+    // Switch from transform-based centering to absolute positioning
+    dragEl.style.left = rect.left + "px";
+    dragEl.style.top = rect.top + "px";
+    dragEl.style.transform = "none";
+    dragEl.style.bottom = "auto";
+    startX = e.clientX - rect.left;
+    startY = e.clientY - rect.top;
+    e.preventDefault();
+  });
+  document.addEventListener("mousemove", e => {
+    if (!isDragging || !dragEl) return;
+    dragEl.style.left = (e.clientX - startX) + "px";
+    dragEl.style.top  = (e.clientY - startY) + "px";
+  });
+  document.addEventListener("mouseup", () => {
+    if (dragEl) dragEl.classList.remove("dragging");
+    isDragging = false; dragEl = null;
+  });
+})();
 // ── End Live Interpreter ───────────────────────────────────────
 </script>
 
