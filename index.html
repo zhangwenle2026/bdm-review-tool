@@ -247,7 +247,7 @@ tbody tr:hover td:first-child{background:var(--hover);}
           <div class="asv" id="asvLbl"></div>
           <button class="svbtn" onclick="saveFeedback()">💾 <span id="lblSave">Save</span></button>
           <button class="subbtn" onclick="openModal()">✓ <span id="lblSub">Submit Feedback</span></button>
-          <div class="subnote" id="subNote">✓ Feedback submitted · 已提交反馈</div>
+          <div class="subnote" id="subNote">✓ Feedback submitted · 已提交反馈 <button onclick="unsubmitFeedback()" style="margin-left:10px;font-size:11px;background:none;border:1px solid #D1D5DB;border-radius:4px;padding:2px 8px;cursor:pointer;color:#6B7280;">Edit</button></div>
         </div>
         <div id="observerView" style="display:none;padding:20px;text-align:center;color:#6B7280;font-size:13px;">
           👁 Observer mode — read only<br>
@@ -765,6 +765,13 @@ window.confirmSub = async () => {
 };
 
 // Generate AI Report
+window.unsubmitFeedback = async () => {
+  if (!me || !curId) return;
+  const rk = me.replace(/\s+/g,"_");
+  await update(ref(db, `reviews/${curId}/feedback/${rk}`), { submitted: false });
+  document.getElementById("subNote").classList.remove("on");
+};
+
 window.genReport = async (id) => {
   const cd = snap[id] || {};
   const c = CANDS.find(x => x.id === id);
