@@ -712,11 +712,11 @@ function loadMyFeedback(id) {
   document.getElementById("taEnc").value = fd.encouraging || fd.draft_enc || "";
   document.getElementById("taCon").value = fd.constructive || fd.draft_con || "";
   const submitted = fd.submitted || false;
-  document.getElementById("taEnc").disabled = submitted;
-  document.getElementById("taCon").disabled = submitted;
+  document.getElementById("taEnc").disabled = false;
+  document.getElementById("taCon").disabled = false;
   document.getElementById("subNote").classList.toggle("on", submitted);
-  document.querySelector(".subbtn").style.display = submitted ? "none" : "block";
-  document.querySelector(".svbtn").style.display = submitted ? "none" : "block";
+  document.querySelector(".subbtn").style.display = "block";
+  document.querySelector(".svbtn").style.display = "block";
 
   // Auto-save
   const inputs = [document.getElementById("taEnc"), document.getElementById("taCon")];
@@ -762,10 +762,6 @@ window.confirmSub = async () => {
   });
   document.getElementById("mBg").classList.remove("on");
   document.getElementById("subNote").classList.add("on");
-  document.getElementById("taEnc").disabled = true;
-  document.getElementById("taCon").disabled = true;
-  document.querySelector(".subbtn").style.display = "none";
-  document.querySelector(".svbtn").style.display = "none";
 };
 
 // Generate AI Report
