@@ -1084,17 +1084,25 @@ function startListening() {
     (interim) => {
       transEl.innerHTML = tgtFinalHTML + `<span class="interp-interim">${interim}</span>`;
       transEl.scrollTop = transEl.scrollHeight;
-      subBox.textContent = interim;
-      clearTimeout(_subtitleTimer);
-      _subtitleTimer = setTimeout(() => { subBox.textContent = ""; }, 6000);
+      if (_subtitleVisible) {
+        const sub = document.getElementById("subtitleOverlay");
+        sub.classList.add("on");
+        subBox.textContent = interim;
+        clearTimeout(_subtitleTimer);
+        _subtitleTimer = setTimeout(() => { subBox.textContent = ""; }, 6000);
+      }
     },
     (final) => {
       tgtFinalHTML += `<span>${final} </span>`;
       transEl.innerHTML = tgtFinalHTML;
       transEl.scrollTop = transEl.scrollHeight;
-      subBox.textContent = final;
-      clearTimeout(_subtitleTimer);
-      _subtitleTimer = setTimeout(() => { subBox.textContent = ""; }, 6000);
+      if (_subtitleVisible) {
+        const sub = document.getElementById("subtitleOverlay");
+        sub.classList.add("on");
+        subBox.textContent = final;
+        clearTimeout(_subtitleTimer);
+        _subtitleTimer = setTimeout(() => { subBox.textContent = ""; }, 6000);
+      }
     }
   );
 
