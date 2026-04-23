@@ -1020,38 +1020,14 @@ window.toggleListening = () => {
   else startListening();
 };
 
-let _recSrc = null, _recTgt = null;
-
-function makeSpeechRec(lang, onInterim, onFinal) {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const r = new SR();
-  r.lang = lang;
-  r.continuous = true;
-  r.interimResults = true;
-  r.maxAlternatives = 1;
-  r._dead = false;
-  r.onresult = (e) => {
-    let interim = "", final = "";
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const t = e.results[i][0].transcript;
-      if (e.results[i].isFinal) final += t;
-      else interim += t;
-    }
-    if (interim) onInterim(interim);
-    if (final)   onFinal(final);
-  };
-  r.onerror = (e) => { if (e.error !== "no-speech" && e.error !== "aborted") console.warn(lang, e.error); };
-  r.onend   = () => { if (!r._dead && _listening) { try { r.start(); } catch(_){} } };
-  return r;
-}
+let _recSrc = null;
 
 function startListening() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) { alert("Please use Chrome."); return; }
 
-  const srcLang    = document.getElementById("interpSrcLang").value;
-  const tgtLang    = document.getElementById("interpTgtLang").value;
-  const tgtRecLang = tgtLang === "zh" ? "zh-CN" : "en-US";
+  const srcLang = document.getElementById("interpSrcLang").value;
+  const tgtLang = document.getElementById("interpTgtLang").value;
 
   _listening = true;
   const btn = document.getElementById("interpStartBtn");
@@ -1060,63 +1036,96 @@ function startListening() {
 
   const origEl  = document.getElementById("interpOrig");
   const transEl = document.getElementById("interpTrans");
-  const subBox  = document.getElementById("subtitleBox");
   origEl.innerHTML = "";
   transEl.innerHTML = "";
 
-  // Source recognition
-  let srcFinalHTML = "";
-  _recSrc = makeSpeechRec(srcLang,
-    (interim) => {
-      origEl.innerHTML = srcFinalHTML + `<span class="interp-interim">${interim}</span>`;
-      origEl.scrollTop = origEl.scrollHeight;
-    },
-    (final) => {
-      srcFinalHTML += `<span>${final} </span>`;
-      origEl.innerHTML = srcFinalHTML;
-      origEl.scrollTop = origEl.scrollHeight;
-    }
-  );
+  _recSrc = new SR();
+  _recSrc.lang = srcLang;
+  _recSrc.continuous = true;
+  _recSrc.interimResults = true;
+  _recSrc.maxAlternatives = 1;
 
-  // Target-language recognition (dual-channel = instant "translation")
-  let tgtFinalHTML = "";
-  _recTgt = makeSpeechRec(tgtRecLang,
-    (interim) => {
-      transEl.innerHTML = tgtFinalHTML + `<span class="interp-interim">${interim}</span>`;
-      transEl.scrollTop = transEl.scrollHeight;
-      if (_subtitleVisible) {
-        const sub = document.getElementById("subtitleOverlay");
-        sub.classList.add("on");
-        subBox.textContent = interim;
-        clearTimeout(_subtitleTimer);
-        _subtitleTimer = setTimeout(() => { subBox.textContent = ""; }, 6000);
-      }
-    },
-    (final) => {
-      tgtFinalHTML += `<span>${final} </span>`;
-      transEl.innerHTML = tgtFinalHTML;
-      transEl.scrollTop = transEl.scrollHeight;
-      if (_subtitleVisible) {
-        const sub = document.getElementById("subtitleOverlay");
-        sub.classList.add("on");
-        subBox.textContent = final;
-        clearTimeout(_subtitleTimer);
-        _subtitleTimer = setTimeout(() => { subBox.textContent = ""; }, 6000);
-      }
+  let finalHTML = "";
+
+  _recSrc.onresult = (e) => {
+    let interim = "", final = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) final += t;
+      else interim += t;
     }
-  );
+    // Show interim immediately in orig panel + subtitle
+    if (interim) {
+      origEl.innerHTML = finalHTML + `<span class="interp-interim">${interim}</span>`;
+      origEl.scrollTop = origEl.scrollHeight;
+      showSubtitle(interim, false);
+    }
+    // On final: translate
+    if (final) {
+      finalHTML += `<span>${final} </span>`;
+      origEl.innerHTML = finalHTML;
+      origEl.scrollTop = origEl.scrollHeight;
+      translateAndShow(final, tgtLang, transEl);
+    }
+  };
+
+  _recSrc.onerror = (e) => {
+    if (e.error !== "no-speech" && e.error !== "aborted") console.warn("SR error:", e.error);
+  };
+  _recSrc.onend = () => {
+    if (_listening) { try { _recSrc.start(); } catch(_){} }
+  };
 
   try { _recSrc.start(); } catch(e) { console.warn(e); }
-  setTimeout(() => { try { _recTgt.start(); } catch(e) { console.warn(e); } }, 300);
 }
 
 function stopListening() {
   _listening = false;
-  if (_recSrc) { _recSrc._dead = true; _recSrc.stop(); _recSrc = null; }
-  if (_recTgt) { _recTgt._dead = true; _recTgt.stop(); _recTgt = null; }
+  if (_recSrc) { _recSrc.onend = null; _recSrc.stop(); _recSrc = null; }
   const btn = document.getElementById("interpStartBtn");
   btn.textContent = "▶ Start";
   btn.className = "interp-start-btn idle";
+}
+
+function showSubtitle(text, isFinal) {
+  if (!_subtitleVisible) return;
+  const sub = document.getElementById("subtitleOverlay");
+  const subBox = document.getElementById("subtitleBox");
+  sub.classList.add("on");
+  subBox.textContent = text;
+  clearTimeout(_subtitleTimer);
+  if (isFinal) {
+    _subtitleTimer = setTimeout(() => { subBox.textContent = ""; }, 6000);
+  }
+}
+
+// MyMemory — free translation API with CORS support
+async function translateAndShow(text, tgtLang, transEl) {
+  if (!text.trim()) return;
+  const srcLang = document.getElementById("interpSrcLang").value;
+  // MyMemory langpair format: "pt-BR|en" or "pt-BR|zh-CN"
+  const srcCode = srcLang === "pt-BR" ? "pt-BR" : "en-US";
+  const tgtCode = tgtLang === "zh" ? "zh-CN" : "en-US";
+  if (srcCode === tgtCode) {
+    // Same language — just show original
+    transEl.innerHTML += `<span>${text} </span>`;
+    transEl.scrollTop = transEl.scrollHeight;
+    showSubtitle(text, true);
+    return;
+  }
+  try {
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${srcCode}|${tgtCode}`;
+    const res  = await fetch(url);
+    const data = await res.json();
+    const translated = data?.responseData?.translatedText || text;
+    transEl.innerHTML += `<span>${translated} </span>`;
+    transEl.scrollTop = transEl.scrollHeight;
+    showSubtitle(translated, true);
+  } catch(e) {
+    console.warn("translate error", e);
+    transEl.innerHTML += `<span>${text} </span>`;
+    transEl.scrollTop = transEl.scrollHeight;
+  }
 }
 
 // ── Draggable + Resizable subtitle overlay ────────────────────
