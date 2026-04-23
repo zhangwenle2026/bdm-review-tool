@@ -150,7 +150,10 @@ tbody tr:hover td:first-child{background:var(--hover);}
 .subtitle-overlay{position:fixed;bottom:260px;left:50%;transform:translateX(-50%);z-index:600;width:700px;max-width:95vw;display:none;}
 .subtitle-overlay.on{display:block;}
 .subtitle-box{background:rgba(0,0,0,.82);color:#fff;font-size:20px;font-weight:500;line-height:1.6;padding:14px 28px;border-radius:12px;text-align:center;backdrop-filter:blur(6px);user-select:none;min-height:52px;word-break:break-word;border:1px solid rgba(255,255,255,.12);}
-.subtitle-box:empty::after{content:"🎙 Subtitle will appear here";color:rgba(255,255,255,.3);font-size:14px;font-style:italic;}
+.subtitle-orig{font-size:15px;color:rgba(255,255,255,.6);font-weight:400;margin-bottom:4px;min-height:1em;}
+.subtitle-trans{font-size:20px;color:#fff;font-weight:600;min-height:1em;}
+.subtitle-trans.interim{color:rgba(255,255,255,.5);font-style:italic;font-size:16px;}
+.subtitle-box:not(:has(.subtitle-orig:not(:empty)))::before{content:"🎙 Subtitle will appear here";color:rgba(255,255,255,.3);font-size:14px;font-style:italic;}
 .subtitle-drag-handle{position:absolute;top:0;left:0;right:24px;bottom:0;cursor:grab;}
 .subtitle-drag-handle:active{cursor:grabbing;}
 .subtitle-resize-handle{position:absolute;bottom:0;right:0;width:20px;height:20px;cursor:se-resize;display:flex;align-items:flex-end;justify-content:flex-end;padding:3px;}
@@ -331,7 +334,10 @@ tbody tr:hover td:first-child{background:var(--hover);}
 <!-- Floating Subtitle Overlay -->
 <div class="subtitle-overlay" id="subtitleOverlay">
   <div class="subtitle-drag-handle" id="subtitleDragHandle"></div>
-  <div class="subtitle-box" id="subtitleBox"></div>
+  <div class="subtitle-box" id="subtitleBox">
+    <div class="subtitle-orig" id="subtitleOrig"></div>
+    <div class="subtitle-trans" id="subtitleTrans"></div>
+  </div>
   <div class="subtitle-resize-handle" id="subtitleResizeHandle"></div>
 </div>
 
@@ -1054,17 +1060,18 @@ function startListening() {
       if (e.results[i].isFinal) final += t;
       else interim += t;
     }
-    // Show interim immediately in orig panel + subtitle
+    // Interim: show original immediately, translation placeholder
     if (interim) {
       origEl.innerHTML = finalHTML + `<span class="interp-interim">${interim}</span>`;
       origEl.scrollTop = origEl.scrollHeight;
-      showSubtitle(interim, false);
+      showSubtitleOrig(interim, true); // italic = still interim
     }
-    // On final: translate
+    // Final: commit original, trigger translation
     if (final) {
       finalHTML += `<span>${final} </span>`;
       origEl.innerHTML = finalHTML;
       origEl.scrollTop = origEl.scrollHeight;
+      showSubtitleOrig(final, false);
       translateAndShow(final, tgtLang, transEl);
     }
   };
@@ -1087,29 +1094,51 @@ function stopListening() {
   btn.className = "interp-start-btn idle";
 }
 
-function showSubtitle(text, isFinal) {
+function showSubtitleOrig(text, isInterim) {
   if (!_subtitleVisible) return;
-  const sub = document.getElementById("subtitleOverlay");
-  const subBox = document.getElementById("subtitleBox");
+  const sub  = document.getElementById("subtitleOverlay");
+  const orig = document.getElementById("subtitleOrig");
   sub.classList.add("on");
-  subBox.textContent = text;
+  orig.style.fontStyle = isInterim ? "italic" : "normal";
+  orig.style.color = isInterim ? "rgba(255,255,255,.45)" : "rgba(255,255,255,.65)";
+  orig.textContent = text;
   clearTimeout(_subtitleTimer);
-  if (isFinal) {
-    _subtitleTimer = setTimeout(() => { subBox.textContent = ""; }, 6000);
-  }
 }
 
-// Translate via Cloudflare Worker (CF AI fallback — always works)
+function showSubtitleTrans(text) {
+  if (!_subtitleVisible) return;
+  const sub   = document.getElementById("subtitleOverlay");
+  const trans = document.getElementById("subtitleTrans");
+  sub.classList.add("on");
+  trans.style.fontStyle = "normal";
+  trans.style.color = "#fff";
+  trans.textContent = text;
+  clearTimeout(_subtitleTimer);
+  _subtitleTimer = setTimeout(() => {
+    document.getElementById("subtitleOrig").textContent = "";
+    trans.textContent = "";
+  }, 7000);
+}
+
+// Translate via Cloudflare Worker (CF AI — always works, no CORS issue)
 async function translateAndShow(text, tgtLang, transEl) {
   if (!text.trim()) return;
   const srcLang = document.getElementById("interpSrcLang").value;
   const srcName = srcLang === "pt-BR" ? "Brazilian Portuguese" : "English";
   const tgtName = tgtLang === "zh" ? "Simplified Chinese" : "English";
 
+  // Show "translating…" placeholder in subtitle trans line
+  if (_subtitleVisible) {
+    const trans = document.getElementById("subtitleTrans");
+    trans.style.fontStyle = "italic";
+    trans.style.color = "rgba(255,255,255,.4)";
+    trans.textContent = "…";
+  }
+
   if (srcName === tgtName) {
     transEl.innerHTML += `<span>${text} </span>`;
     transEl.scrollTop = transEl.scrollHeight;
-    showSubtitle(text, true);
+    showSubtitleTrans(text);
     return;
   }
 
@@ -1119,7 +1148,7 @@ async function translateAndShow(text, tgtLang, transEl) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         messages: [
-          { role: "system", content: `You are a translator. Translate from ${srcName} to ${tgtName}. Output ONLY the translation, no explanation.` },
+          { role: "system", content: `Translate from ${srcName} to ${tgtName}. Output ONLY the translation. No explanation, no quotes.` },
           { role: "user", content: text }
         ]
       })
@@ -1128,11 +1157,12 @@ async function translateAndShow(text, tgtLang, transEl) {
     const translated = data?.choices?.[0]?.message?.content?.trim() || text;
     transEl.innerHTML += `<span>${translated} </span>`;
     transEl.scrollTop = transEl.scrollHeight;
-    showSubtitle(translated, true);
+    showSubtitleTrans(translated);
   } catch(e) {
     console.warn("translate error", e);
     transEl.innerHTML += `<span>${text} </span>`;
     transEl.scrollTop = transEl.scrollHeight;
+    showSubtitleTrans(text);
   }
 }
 
@@ -1191,9 +1221,9 @@ async function translateAndShow(text, tgtLang, transEl) {
       overlay.style.maxWidth = "none";
       overlay.style.height = newH + "px";
       // Scale font size proportionally
-      const subBox = document.getElementById("subtitleBox");
       const baseFontSize = Math.max(12, Math.round(newW / 35));
-      subBox.style.fontSize = baseFontSize + "px";
+      document.getElementById("subtitleTrans").style.fontSize = baseFontSize + "px";
+      document.getElementById("subtitleOrig").style.fontSize = Math.max(10, Math.round(baseFontSize * 0.72)) + "px";
     }
   });
 
