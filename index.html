@@ -127,6 +127,33 @@ tbody tr:hover td:first-child{background:var(--hover);}
 @keyframes sp{to{transform:rotate(360deg);}}
 ::-webkit-scrollbar{width:5px;height:5px;}::-webkit-scrollbar-thumb{background:#D1D5DB;border-radius:3px;}
 
+/* ── Live Interpreter ── */
+.interp-panel{position:fixed;bottom:0;left:0;right:0;z-index:500;background:rgba(15,20,30,.92);backdrop-filter:blur(12px);border-top:1px solid rgba(255,255,255,.1);display:none;flex-direction:column;}
+.interp-panel.on{display:flex;}
+.interp-bar{display:flex;align-items:center;gap:10px;padding:10px 20px;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0;}
+.interp-bar h4{font-size:12px;font-weight:700;color:#fff;letter-spacing:.5px;text-transform:uppercase;flex:1;}
+.interp-ctrl{display:flex;align-items:center;gap:8px;}
+.interp-lang-sel{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;padding:4px 10px;border-radius:5px;font-size:11px;cursor:pointer;}
+.interp-start-btn{padding:5px 14px;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;border:none;}
+.interp-start-btn.idle{background:#3B82F6;color:#fff;}
+.interp-start-btn.listening{background:#EF4444;color:#fff;animation:pulse 1.5s infinite;}
+.interp-close-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;padding:5px 10px;border-radius:5px;font-size:11px;cursor:pointer;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.6;}}
+.interp-body{display:flex;gap:0;flex:1;min-height:120px;max-height:200px;}
+.interp-col{flex:1;padding:12px 20px;overflow-y:auto;border-right:1px solid rgba(255,255,255,.08);}
+.interp-col:last-child{border-right:none;}
+.interp-col-hd{font-size:9px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;}
+.interp-orig{font-size:13px;color:rgba(255,255,255,.75);line-height:1.6;}
+.interp-trans{font-size:14px;color:#fff;font-weight:500;line-height:1.6;}
+.interp-interim{color:rgba(255,255,255,.4);font-style:italic;}
+/* Floating subtitle overlay */
+.subtitle-overlay{position:fixed;bottom:220px;left:50%;transform:translateX(-50%);z-index:600;max-width:800px;width:90%;pointer-events:none;display:none;}
+.subtitle-overlay.on{display:block;}
+.subtitle-box{background:rgba(0,0,0,.8);color:#fff;font-size:18px;font-weight:500;line-height:1.5;padding:12px 24px;border-radius:10px;text-align:center;backdrop-filter:blur(4px);}
+/* Interp toggle button in rtop */
+.interp-toggle{background:rgba(139,92,246,.12);border:1px solid #7C3AED;color:#7C3AED;padding:5px 13px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:600;transition:all .15s;}
+.interp-toggle:hover,.interp-toggle.on{background:#7C3AED;color:#fff;}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
@@ -199,6 +226,7 @@ tbody tr:hover td:first-child{background:var(--hover);}
       <h2 id="rName">—</h2>
       <p id="rInfo">—</p>
     </div>
+    <button class="interp-toggle" id="interpToggle" onclick="toggleInterp()">🎙 Live Interpreter</button>
     <button class="xbtn" onclick="closeReview()">×</button>
   </div>
   <div class="rcols">
@@ -258,6 +286,41 @@ tbody tr:hover td:first-child{background:var(--hover);}
       </div>
     </div>
   </div>
+</div>
+
+<!-- Live Interpreter Panel -->
+<div class="interp-panel" id="interpPanel">
+  <div class="interp-bar">
+    <h4>🎙 Live Interpreter</h4>
+    <div class="interp-ctrl">
+      <select class="interp-lang-sel" id="interpSrcLang">
+        <option value="pt-BR">🇧🇷 Portuguese (BR)</option>
+        <option value="en-US">🇺🇸 English (US)</option>
+      </select>
+      <span style="color:rgba(255,255,255,.4);font-size:11px;">→</span>
+      <select class="interp-lang-sel" id="interpTgtLang">
+        <option value="en">English</option>
+        <option value="zh">中文</option>
+      </select>
+      <button class="interp-start-btn idle" id="interpStartBtn" onclick="toggleListening()">▶ Start</button>
+      <button class="interp-close-btn" onclick="toggleInterp()">✕ Close</button>
+    </div>
+  </div>
+  <div class="interp-body">
+    <div class="interp-col">
+      <div class="interp-col-hd">Original</div>
+      <div class="interp-orig" id="interpOrig">Waiting for speech…</div>
+    </div>
+    <div class="interp-col">
+      <div class="interp-col-hd">Translation</div>
+      <div class="interp-trans" id="interpTrans">—</div>
+    </div>
+  </div>
+</div>
+
+<!-- Floating Subtitle Overlay -->
+<div class="subtitle-overlay" id="subtitleOverlay">
+  <div class="subtitle-box" id="subtitleBox"></div>
 </div>
 
 <div class="mbg" id="mBg">
@@ -571,6 +634,12 @@ window.closeReview = () => {
   document.body.style.overflow = "";
   curId = "";
   _origPdfUrl = null;
+  // Stop interpreter
+  stopListening();
+  document.getElementById("interpPanel").classList.remove("on");
+  document.getElementById("subtitleOverlay").classList.remove("on");
+  const interpToggle = document.getElementById("interpToggle");
+  if (interpToggle) interpToggle.classList.remove("on");
   // Reset language tabs to EN
   document.querySelectorAll(".tbtn").forEach(b => b.classList.remove("on"));
   const tbEN = document.getElementById("tbEN");
@@ -686,22 +755,32 @@ window.genSummary = async () => {
       contentText = await extractTextFromFile(cd.fileBase64, cd.fileType || "application/pdf");
     }
     aiArea.innerHTML = `<p class="aip"><span class="spin"></span> Generating structured analysis…</p>`;
-    const prompt = `You are evaluating a BD candidate named "${c?.name}" applying for BDM (Business Development Manager) promotion at Keeta (food delivery platform in Brazil).
+    const prompt = `You are a senior talent evaluator at Keeta, a food delivery platform operating in Brazil. You are conducting a rigorous promotion review for a BD (Business Development) candidate applying for the BDM (Business Development Manager) role.
 
-${contentText ? `Here is the extracted content from their presentation:\n---\n${contentText.slice(0, 6000)}\n---` : `No presentation uploaded yet. Provide a general evaluation framework.`}
+Candidate name: ${c?.name}
+${contentText ? `\nPresentation content:\n---\n${contentText.slice(0, 7000)}\n---` : "\nNo presentation uploaded. Evaluate based on the candidate name and provide a general BDM readiness framework."}
 
-Provide a structured evaluation in both English and Chinese using this exact JSON format:
+Evaluate this candidate thoroughly across 5 dimensions relevant to BDM at Keeta Brazil:
+1. Business acumen & market understanding (Brazil food delivery landscape, competitive dynamics)
+2. BD execution capability (merchant acquisition, negotiation, deal structuring, KPIs)
+3. Team leadership & people management potential
+4. Strategic thinking & data-driven decision making
+5. Communication & stakeholder management
+
+Provide a deep, specific, evidence-based evaluation in BOTH English and Chinese. Be direct and candid — highlight real strengths with concrete examples from the presentation, and identify genuine development areas with specific suggestions. Avoid generic statements.
+
+Return ONLY this JSON (no markdown, no extra text):
 {
-  "background_en": "Brief background summary in 2-3 sentences",
-  "background_zh": "简要背景摘要，2-3句",
-  "strengths_en": ["strength 1", "strength 2", "strength 3"],
-  "strengths_zh": ["优势1", "优势2", "优势3"],
-  "risks_en": ["development area 1", "development area 2"],
-  "risks_zh": ["成长空间1", "成长空间2"],
-  "assessment_en": "Overall BDM readiness assessment in 2-3 sentences",
-  "assessment_zh": "综合BDM晋升评估，2-3句话"
-}
-Return only valid JSON, no markdown, no other text.`;
+  "background_en": "3-4 sentence professional background summary including key metrics/achievements mentioned",
+  "background_zh": "3-4句专业背景摘要，包含关键数据和成就",
+  "strengths_en": ["Specific strength 1 with evidence", "Specific strength 2 with evidence", "Specific strength 3 with evidence", "Specific strength 4 with evidence"],
+  "strengths_zh": ["具体优势1（含依据）", "具体优势2（含依据）", "具体优势3（含依据）", "具体优势4（含依据）"],
+  "risks_en": ["Specific development area 1 with concrete suggestion", "Specific development area 2 with concrete suggestion", "Specific development area 3 with concrete suggestion"],
+  "risks_zh": ["具体成长空间1（含建议）", "具体成长空间2（含建议）", "具体成长空间3（含建议）"],
+  "readiness_score": "X/10",
+  "assessment_en": "3-4 sentence candid overall assessment of BDM readiness, including recommendation (promote / promote with conditions / not yet ready) and rationale",
+  "assessment_zh": "3-4句综合BDM晋升评估，包含明确建议（建议晋升/附条件晋升/暂不晋升）及理由"
+}`;
 
     const raw = await callAI(prompt);
     const clean = raw.replace(/```json\n?/g,"").replace(/```\n?/g,"").trim();
@@ -721,11 +800,14 @@ function renderAISummary(s) {
   const aiArea = document.getElementById("aiArea");
   const mkList = (arr) => arr ? arr.map(i=>`<li>${i}</li>`).join("") : "";
   aiArea.innerHTML = `<div class="aiarea">
-    <div class="ai-badge">✦ AI Generated</div>
-    ${s.background_en ? `<div class="ais"><h4>Background / 背景</h4><p>${s.background_en}</p>${s.background_zh?`<p style="color:#6B7280;margin-top:6px">${s.background_zh}</p>`:""}</div>` : ""}
-    ${s.strengths_en ? `<div class="ais"><h4>Key Strengths / 核心优势</h4><ul>${mkList(s.strengths_en)}</ul>${s.strengths_zh?`<ul style="color:#6B7280;margin-top:6px">${mkList(s.strengths_zh)}</ul>`:""}</div>` : ""}
-    ${s.risks_en ? `<div class="ais"><h4>Areas to Develop / 成长空间</h4><ul>${mkList(s.risks_en)}</ul>${s.risks_zh?`<ul style="color:#6B7280;margin-top:6px">${mkList(s.risks_zh)}</ul>`:""}</div>` : ""}
-    ${s.assessment_en ? `<div class="ais"><h4>Overall Assessment / 综合评估</h4><p>${s.assessment_en}</p>${s.assessment_zh?`<p style="color:#6B7280;margin-top:6px">${s.assessment_zh}</p>`:""}</div>` : ""}
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div class="ai-badge">✦ AI Generated</div>
+      ${s.readiness_score ? `<div style="background:#EFF6FF;color:#1D4ED8;font-size:13px;font-weight:700;padding:4px 12px;border-radius:20px;border:1px solid #BFDBFE;">BDM Readiness: ${s.readiness_score}</div>` : ""}
+    </div>
+    ${s.background_en ? `<div class="ais"><h4>Background / 背景</h4><p>${s.background_en}</p>${s.background_zh?`<p style="color:#6B7280;margin-top:6px;font-size:12px">${s.background_zh}</p>`:""}</div>` : ""}
+    ${s.strengths_en ? `<div class="ais"><h4>Key Strengths / 核心优势</h4><ul>${mkList(s.strengths_en)}</ul>${s.strengths_zh?`<ul style="color:#6B7280;margin-top:6px;font-size:12px">${mkList(s.strengths_zh)}</ul>`:""}</div>` : ""}
+    ${s.risks_en ? `<div class="ais"><h4>Areas to Develop / 成长空间</h4><ul>${mkList(s.risks_en)}</ul>${s.risks_zh?`<ul style="color:#6B7280;margin-top:6px;font-size:12px">${mkList(s.risks_zh)}</ul>`:""}</div>` : ""}
+    ${s.assessment_en ? `<div class="ais"><h4>Overall Assessment / 综合评估</h4><p>${s.assessment_en}</p>${s.assessment_zh?`<p style="color:#6B7280;margin-top:6px;font-size:12px">${s.assessment_zh}</p>`:""}</div>` : ""}
   </div>`;
 }
 
@@ -865,6 +947,115 @@ window.confirmGate = () => {
 // Init
 applyI18n();
 renderTable();
+
+// ── Live Interpreter ──────────────────────────────────────────
+let _recognition = null;
+let _interpActive = false;
+let _listening = false;
+let _subtitleTimer = null;
+let _translateDebounce = null;
+
+window.toggleInterp = () => {
+  const panel = document.getElementById("interpPanel");
+  const btn = document.getElementById("interpToggle");
+  const sub = document.getElementById("subtitleOverlay");
+  if (panel.classList.contains("on")) {
+    // Close
+    stopListening();
+    panel.classList.remove("on");
+    sub.classList.remove("on");
+    btn.classList.remove("on");
+  } else {
+    panel.classList.add("on");
+    sub.classList.add("on");
+    btn.classList.add("on");
+  }
+};
+
+window.toggleListening = () => {
+  if (_listening) stopListening();
+  else startListening();
+};
+
+function startListening() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    alert("Your browser does not support Web Speech API. Please use Chrome.");
+    return;
+  }
+  const srcLang = document.getElementById("interpSrcLang").value;
+  _recognition = new SpeechRecognition();
+  _recognition.lang = srcLang;
+  _recognition.continuous = true;
+  _recognition.interimResults = true;
+  _recognition.maxAlternatives = 1;
+
+  _recognition.onstart = () => {
+    _listening = true;
+    const btn = document.getElementById("interpStartBtn");
+    btn.textContent = "■ Stop";
+    btn.className = "interp-start-btn listening";
+  };
+
+  _recognition.onresult = (e) => {
+    let interim = "", final = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) final += t;
+      else interim += t;
+    }
+    const origEl = document.getElementById("interpOrig");
+    if (final) {
+      origEl.innerHTML += `<span>${final} </span>`;
+      origEl.scrollTop = origEl.scrollHeight;
+      translateChunk(final);
+    } else if (interim) {
+      // Show interim in grey
+      const existing = origEl.querySelectorAll("span:not(.interim)");
+      let existingText = Array.from(existing).map(s => s.textContent).join("");
+      origEl.innerHTML = Array.from(existing).map(s => s.outerHTML).join("") +
+        `<span class="interp-interim">${interim}</span>`;
+    }
+  };
+
+  _recognition.onerror = (e) => {
+    if (e.error !== "no-speech" && e.error !== "aborted") {
+      console.warn("Speech error:", e.error);
+    }
+  };
+
+  _recognition.onend = () => {
+    if (_listening) _recognition.start(); // auto-restart
+  };
+
+  _recognition.start();
+}
+
+function stopListening() {
+  _listening = false;
+  if (_recognition) { _recognition.stop(); _recognition = null; }
+  const btn = document.getElementById("interpStartBtn");
+  btn.textContent = "▶ Start";
+  btn.className = "interp-start-btn idle";
+}
+
+async function translateChunk(text) {
+  if (!text.trim()) return;
+  const tgtLang = document.getElementById("interpTgtLang").value;
+  const langName = tgtLang === "zh" ? "Chinese (Simplified)" : "English";
+  try {
+    const result = await callAI(`Translate to ${langName}. Output ONLY the translation, nothing else:\n\n${text}`);
+    const transEl = document.getElementById("interpTrans");
+    transEl.innerHTML += `<span>${result.trim()} </span>`;
+    transEl.scrollTop = transEl.scrollHeight;
+    // Update floating subtitle
+    const subBox = document.getElementById("subtitleBox");
+    subBox.textContent = result.trim();
+    clearTimeout(_subtitleTimer);
+    _subtitleTimer = setTimeout(() => { subBox.textContent = ""; }, 8000);
+  } catch(e) { console.warn("translate error", e); }
+}
+// ── End Live Interpreter ───────────────────────────────────────
 </script>
 
 </body>
