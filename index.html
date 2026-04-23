@@ -478,13 +478,17 @@ window.uploadFile = async (id, input) => {
 
 async function extractBasicInfo(id, b64, mime) {
   try {
-    const prompt = `You are analyzing a BD candidate's promotion presentation. Extract basic personal info in this exact format (pipe-separated, no explanation):
+    // Step 1: extract text
+    const rawText = await extractTextFromFile(b64, mime);
+    if (!rawText) return;
+    // Step 2: ask Gemini to parse basic info from text
+    const prompt = `From this BD candidate's presentation text, extract basic personal info in this exact format (pipe-separated, no explanation):
 [Name] | [Education level] | [Years of BD experience] | [City/Region]
-Only return the pipe-separated line, nothing else.`;
-    const body = { contents:[{ parts:[
-      { text: prompt },
-      { inline_data:{ mime_type: mime.includes("pdf")?"application/pdf":"application/vnd.ms-powerpoint", data: b64 }}
-    ]}]};
+Only return the pipe-separated line, nothing else.
+
+Text:
+${rawText.slice(0, 3000)}`;
+    const body = { contents:[{ parts:[{ text: prompt }]}]};
     const res = await fetch(GEMINI_URL, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)});
     const data = await res.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
@@ -508,16 +512,20 @@ window.openReview = id => {
   // PPT
   const pptArea = document.getElementById("pptArea");
   if (cd.fileBase64) {
-    const mime = (cd.fileType || "application/pdf").includes("pdf") ? "application/pdf" : "application/vnd.openxmlformats-officedocument.presentationml.presentation";
-    const dataUrl = `data:${mime};base64,${cd.fileBase64}`;
-    if (mime === "application/pdf") {
-      pptArea.innerHTML = `<embed src="${dataUrl}" width="100%" height="520" type="application/pdf" style="border-radius:6px">`;
+    const isPdf = (cd.fileType || "application/pdf").includes("pdf");
+    if (isPdf) {
+      // Convert base64 → Blob → Object URL (avoids data: URL size limits)
+      const byteChars = atob(cd.fileBase64);
+      const byteArr = new Uint8Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
+      const blob = new Blob([byteArr], {type: "application/pdf"});
+      const blobUrl = URL.createObjectURL(blob);
+      pptArea.innerHTML = `<iframe src="${blobUrl}" width="100%" height="560" style="border:none;border-radius:6px;display:block"></iframe>`;
     } else {
-      // For PPT use Google Docs viewer (needs public URL — show fallback)
       pptArea.innerHTML = `<div style="padding:32px;text-align:center;color:#6B7280;font-size:13px">
         <div style="font-size:28px;margin-bottom:12px">📊</div>
         <div style="font-weight:600;margin-bottom:6px">${cd.fileName}</div>
-        <div style="font-size:11px;color:#9CA3AF">PPT preview requires a public URL.<br>PDF files can be previewed directly.</div>
+        <div style="font-size:11px;color:#9CA3AF">Please upload PDF format for in-browser preview.<br>PPTX files cannot be previewed directly.<br>请上传 PDF 格式以支持在线预览。</div>
       </div>`;
     }
   } else {
@@ -582,36 +590,53 @@ async function genTranslation(id, targetLang) {
 }
 
 // Generate AI Summary
+// Extract text from PDF base64 using a simple text-layer approach via Gemini
+async function extractTextFromFile(b64, mime) {
+  const body = { contents:[{ parts:[
+    { text: "Extract ALL text content from this document. Return plain text only, preserve structure with newlines. No commentary." },
+    { inline_data:{ mime_type: mime.includes("pdf") ? "application/pdf" : "application/vnd.openxmlformats-officedocument.presentationml.presentation", data: b64 }}
+  ]}]};
+  const res = await fetch(GEMINI_URL, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const data = await res.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+}
+
 window.genSummary = async () => {
   const cd = snap[curId] || {};
   const btn = document.getElementById("genBtn");
   const aiArea = document.getElementById("aiArea");
   btn.disabled = true;
   btn.innerHTML = `<span class="spin"></span>${T[lang].genAnalysis||"Analyzing…"}`;
-  aiArea.innerHTML = `<p class="aip"><span class="spin"></span> Analyzing presentation…</p>`;
+  aiArea.innerHTML = `<p class="aip"><span class="spin"></span> Reading presentation…</p>`;
   try {
-    let prompt = `Analyze this BD candidate's promotion presentation and provide a structured evaluation in both English and Chinese. Use this exact JSON format:
+    const c = CANDS.find(x => x.id === curId);
+    let contentText = "";
+    if (cd.fileBase64) {
+      aiArea.innerHTML = `<p class="aip"><span class="spin"></span> Extracting content with AI…</p>`;
+      contentText = await extractTextFromFile(cd.fileBase64, cd.fileType || "application/pdf");
+    }
+    aiArea.innerHTML = `<p class="aip"><span class="spin"></span> Generating structured analysis…</p>`;
+    const prompt = `You are evaluating a BD candidate named "${c?.name}" applying for BDM (Business Development Manager) promotion at Keeta (food delivery platform in Brazil).
+
+${contentText ? `Here is the extracted content from their presentation:\n---\n${contentText.slice(0, 6000)}\n---` : `No presentation uploaded yet. Provide a general evaluation framework.`}
+
+Provide a structured evaluation in both English and Chinese using this exact JSON format:
 {
-  "background_en": "Brief background summary in English",
-  "background_zh": "简要背景摘要",
+  "background_en": "Brief background summary in 2-3 sentences",
+  "background_zh": "简要背景摘要，2-3句",
   "strengths_en": ["strength 1", "strength 2", "strength 3"],
   "strengths_zh": ["优势1", "优势2", "优势3"],
-  "risks_en": ["risk/gap 1", "risk/gap 2"],
-  "risks_zh": ["风险1", "风险2"],
-  "assessment_en": "Overall assessment in 2-3 sentences",
-  "assessment_zh": "总体评估，2-3句话"
+  "risks_en": ["development area 1", "development area 2"],
+  "risks_zh": ["成长空间1", "成长空间2"],
+  "assessment_en": "Overall BDM readiness assessment in 2-3 sentences",
+  "assessment_zh": "综合BDM晋升评估，2-3句话"
 }
-Return only valid JSON, no other text.`;
-    let parts = [{ text: prompt }];
-    if (cd.fileBase64) {
-      parts.push({ inline_data:{ mime_type: cd.fileType||"application/pdf", data: cd.fileBase64 }});
-    } else {
-      const c = CANDS.find(x => x.id === curId);
-      parts[0].text = `Provide a structured evaluation for BD candidate "${c?.name}" applying for BDM promotion. Use fictional but realistic content. ` + prompt;
-    }
-    const body = { contents:[{ parts }]};
+Return only valid JSON, no markdown, no other text.`;
+
+    const body = { contents:[{ parts:[{ text: prompt }]}]};
     const res = await fetch(GEMINI_URL, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
     const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
     const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
     const clean = raw.replace(/```json\n?/g,"").replace(/```\n?/g,"").trim();
     let parsed;
@@ -619,7 +644,8 @@ Return only valid JSON, no other text.`;
     await update(ref(db, `reviews/${curId}`), { aiSummary: parsed });
     renderAISummary(parsed);
   } catch(e) {
-    aiArea.innerHTML = `<p class="aip" style="color:#EF4444">Analysis failed. Please try again.</p>`;
+    console.error("genSummary error:", e);
+    aiArea.innerHTML = `<p class="aip" style="color:#EF4444">Analysis failed: ${e.message||"Please try again."}</p>`;
   }
   btn.disabled = false;
   btn.textContent = T[lang].genBtn;
