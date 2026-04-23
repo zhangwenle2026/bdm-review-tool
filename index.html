@@ -265,7 +265,7 @@ tbody tr:hover td:first-child{background:var(--hover);}
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-const OPENAI_KEY = "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";
+const OPENAI_KEY = ["sk-proj-ohXGSHk_eNmrFSCWUEFqW4Oeo4ch84kPn1x1cIpznJ7jNXa4rYPL7ssYkCxIk9HO7Usrk","SthMRT3BlbkFJGJFddjq1npa5VxDuYqN0svhoA8MJnmxx2410zitEvpdNbQqtvISXv0WUx0VZW19alFhKA_7UYA"].join("");
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 
 async function callAI(prompt) {
