@@ -1099,25 +1099,33 @@ function showSubtitle(text, isFinal) {
   }
 }
 
-// MyMemory — free translation API with CORS support
+// Translate via Cloudflare Worker (CF AI fallback — always works)
 async function translateAndShow(text, tgtLang, transEl) {
   if (!text.trim()) return;
   const srcLang = document.getElementById("interpSrcLang").value;
-  // MyMemory langpair format: "pt-BR|en" or "pt-BR|zh-CN"
-  const srcCode = srcLang === "pt-BR" ? "pt-BR" : "en-US";
-  const tgtCode = tgtLang === "zh" ? "zh-CN" : "en-US";
-  if (srcCode === tgtCode) {
-    // Same language — just show original
+  const srcName = srcLang === "pt-BR" ? "Brazilian Portuguese" : "English";
+  const tgtName = tgtLang === "zh" ? "Simplified Chinese" : "English";
+
+  if (srcName === tgtName) {
     transEl.innerHTML += `<span>${text} </span>`;
     transEl.scrollTop = transEl.scrollHeight;
     showSubtitle(text, true);
     return;
   }
+
   try {
-    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${srcCode}|${tgtCode}`;
-    const res  = await fetch(url);
+    const res = await fetch("https://bdm-review.zhangwenele2026.workers.dev", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: [
+          { role: "system", content: `You are a translator. Translate from ${srcName} to ${tgtName}. Output ONLY the translation, no explanation.` },
+          { role: "user", content: text }
+        ]
+      })
+    });
     const data = await res.json();
-    const translated = data?.responseData?.translatedText || text;
+    const translated = data?.choices?.[0]?.message?.content?.trim() || text;
     transEl.innerHTML += `<span>${translated} </span>`;
     transEl.scrollTop = transEl.scrollHeight;
     showSubtitle(translated, true);
