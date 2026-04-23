@@ -51,7 +51,7 @@ tbody tr:hover td:first-child{background:var(--hover);}
 .fb-card.con{background:var(--con-bg);border-color:var(--con-bdr);}
 .fb-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
 .fb-lbl.enc{color:var(--enc-txt);}.fb-lbl.con{color:var(--con-txt);}
-.fb-txt{font-size:11px;line-height:1.5;color:var(--txt);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+.fb-txt{font-size:11px;line-height:1.5;color:var(--txt);white-space:pre-wrap;word-break:break-word;}
 .fb-empty{border:1.5px dashed var(--bdr);border-radius:6px;padding:10px;text-align:center;color:var(--muted);font-size:11px;font-style:italic;}
 .rptbtn{background:transparent;border:1px solid #7C3AED;color:#7C3AED;padding:6px 11px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:500;width:100%;transition:all .2s;white-space:nowrap;}
 .rptbtn:hover{background:#7C3AED;color:#fff;transform:translateY(-1px);}
@@ -398,7 +398,9 @@ const fbTransCache = {}; // key: `${candId}_${rk}_${lang}` → {enc, con}
 
 async function translateText(text, targetLang) {
   if (!text || !text.trim()) return text;
-  const tgtName = targetLang === "zh" ? "Simplified Chinese" : "Brazilian Portuguese";
+  const tgtName = targetLang === "zh" ? "Simplified Chinese"
+                : targetLang === "pt" ? "Brazilian Portuguese"
+                : "English";
   try {
     const res = await fetch(AI_PROXY, {
       method: "POST",
@@ -569,44 +571,36 @@ function renderTable() {
         const cellId = `fbc_${c.id}_${rk}`;
         const encL = T[lang].encL;
         const conL = T[lang].conL;
-        if (lang === "en") {
+        // All languages: check translation cache; EN skips AI call only if text is already English
+        const ckey = `${c.id}_${rk}_${lang}`;
+        const cached = fbTransCache[ckey];
+        if (cached) {
           html += `<td class="fbc" id="${cellId}">
-            ${fd.encouraging ? `<div class="fb-card enc"><div class="fb-lbl enc">${encL}</div><div class="fb-txt">${fd.encouraging}</div></div>` : ""}
-            ${fd.constructive ? `<div class="fb-card con"><div class="fb-lbl con">${conL}</div><div class="fb-txt">${fd.constructive}</div></div>` : ""}
+            ${cached.enc ? `<div class="fb-card enc"><div class="fb-lbl enc">${encL}</div><div class="fb-txt">${cached.enc}</div></div>` : ""}
+            ${cached.con ? `<div class="fb-card con"><div class="fb-lbl con">${conL}</div><div class="fb-txt">${cached.con}</div></div>` : ""}
           </td>`;
         } else {
-          // Check cache first
-          const ckey = `${c.id}_${rk}_${lang}`;
-          const cached = fbTransCache[ckey];
-          if (cached) {
-            html += `<td class="fbc" id="${cellId}">
-              ${cached.enc ? `<div class="fb-card enc"><div class="fb-lbl enc">${encL}</div><div class="fb-txt">${cached.enc}</div></div>` : ""}
-              ${cached.con ? `<div class="fb-card con"><div class="fb-lbl con">${conL}</div><div class="fb-txt">${cached.con}</div></div>` : ""}
-            </td>`;
-          } else {
-            // Show loading, then async translate
-            html += `<td class="fbc" id="${cellId}"><div class="fb-empty" style="color:#9CA3AF;font-style:italic">Translating…</div></td>`;
-            // Schedule async translate
-            (async () => {
-              try {
-                const t = await ensureFbTrans(c.id, rk, fd.encouraging||"", fd.constructive||"", lang);
-                const cell = document.getElementById(cellId);
-                if (cell) {
-                  cell.innerHTML = `
-                    ${t.enc ? `<div class="fb-card enc"><div class="fb-lbl enc">${encL}</div><div class="fb-txt">${t.enc}</div></div>` : ""}
-                    ${t.con ? `<div class="fb-card con"><div class="fb-lbl con">${conL}</div><div class="fb-txt">${t.con}</div></div>` : ""}
-                  `;
-                }
-              } catch(e) {
-                console.warn("fb translate error", e);
-                const cell = document.getElementById(cellId);
-                if (cell) cell.innerHTML = `
-                  ${fd.encouraging ? `<div class="fb-card enc"><div class="fb-lbl enc">${encL}</div><div class="fb-txt">${fd.encouraging}</div></div>` : ""}
-                  ${fd.constructive ? `<div class="fb-card con"><div class="fb-lbl con">${conL}</div><div class="fb-txt">${fd.constructive}</div></div>` : ""}
+          // Show loading, then async translate
+          html += `<td class="fbc" id="${cellId}"><div class="fb-empty" style="color:#9CA3AF;font-style:italic">Translating…</div></td>`;
+          (async () => {
+            try {
+              const t = await ensureFbTrans(c.id, rk, fd.encouraging||"", fd.constructive||"", lang);
+              const cell = document.getElementById(cellId);
+              if (cell) {
+                cell.innerHTML = `
+                  ${t.enc ? `<div class="fb-card enc"><div class="fb-lbl enc">${encL}</div><div class="fb-txt">${t.enc}</div></div>` : ""}
+                  ${t.con ? `<div class="fb-card con"><div class="fb-lbl con">${conL}</div><div class="fb-txt">${t.con}</div></div>` : ""}
                 `;
               }
-            })();
-          }
+            } catch(e) {
+              console.warn("fb translate error", e);
+              const cell = document.getElementById(cellId);
+              if (cell) cell.innerHTML = `
+                ${fd.encouraging ? `<div class="fb-card enc"><div class="fb-lbl enc">${encL}</div><div class="fb-txt">${fd.encouraging}</div></div>` : ""}
+                ${fd.constructive ? `<div class="fb-card con"><div class="fb-lbl con">${conL}</div><div class="fb-txt">${fd.constructive}</div></div>` : ""}
+              `;
+            }
+          })();
         }
       } else {
         html += `<td class="fbc"><div class="fb-empty">—</div></td>`;
