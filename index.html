@@ -372,8 +372,10 @@ function renderTable() {
     const tr = document.createElement("tr");
     let html = "";
 
-    // Name + MIS
-    html += `<td><div class="td-n">${c.name}</div><div class="td-mis">${c.mis || "—"}</div></td>`;
+    // Name
+    html += `<td><div class="td-n">${c.name}</div></td>`;
+    // MIS (blank placeholder until Eric provides)
+    html += `<td><div class="td-mis" style="font-size:12px;color:var(--muted)">${c.mis || "—"}</div></td>`;
     // Time
     html += `<td><div class="td-time">⏰ ${c.time}</div></td>`;
     // Upload
