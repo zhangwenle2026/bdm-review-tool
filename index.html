@@ -56,8 +56,15 @@ tbody tr:hover td:first-child{background:var(--hover);}
 .rptbtn{background:transparent;border:1px solid #7C3AED;color:#7C3AED;padding:6px 11px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:500;width:100%;transition:all .2s;white-space:nowrap;}
 .rptbtn:hover{background:#7C3AED;color:#fff;transform:translateY(-1px);}
 .rptbtn:disabled{opacity:.4;cursor:not-allowed;transform:none;}
-.rpt-content{margin-top:8px;font-size:11px;line-height:1.6;}
-.rpt-content{color:#4C1D95;}
+.rpt-content{margin-top:6px;font-size:11px;line-height:1.6;display:flex;gap:6px;}
+.rpt-enc,.rpt-con{flex:1;min-width:0;border-radius:6px;padding:7px 9px;border:1px solid;}
+.rpt-enc{background:var(--enc-bg);border-color:var(--enc-bdr);}
+.rpt-con{background:var(--con-bg);border-color:var(--con-bdr);}
+.rpt-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
+.rpt-lbl.enc{color:var(--enc-txt);}.rpt-lbl.con{color:var(--con-txt);}
+.rpt-txt{color:var(--txt);font-size:11px;line-height:1.5;}
+.rpt-pdf-btn{margin-top:6px;width:100%;background:transparent;border:1px solid #7C3AED;color:#7C3AED;padding:4px 8px;border-radius:5px;cursor:pointer;font-size:10px;font-weight:600;transition:all .2s;}
+.rpt-pdf-btn:hover{background:#7C3AED;color:#fff;}
 .rov{display:none;position:fixed;inset:0;background:var(--bg);z-index:200;flex-direction:column;}
 .rov.entering{opacity:0;transform:translateX(20px);}
 .rov.on{display:flex;animation:rovIn .25s ease forwards;}
@@ -613,7 +620,18 @@ function renderTable() {
     if (aiReport) {
       html += `<td style="min-width:180px;max-width:220px">
         <div class="ai-badge">✦ AI</div>
-        <div class="rpt-content">${aiReport[lang] || aiReport.en || ""}</div>
+        ${(() => {
+          const r = aiReport[lang] || aiReport.en || {};
+          const encL = T[lang].encL; const conL = T[lang].conL;
+          if (typeof r === 'object' && (r.enc || r.con)) {
+            return `<div class="rpt-content">
+              <div class="rpt-enc"><div class="rpt-lbl enc">${encL}</div><div class="rpt-txt">${r.enc||""}</div></div>
+              <div class="rpt-con"><div class="rpt-lbl con">${conL}</div><div class="rpt-txt">${r.con||""}</div></div>
+            </div>`;
+          }
+          return `<div class="rpt-content" style="display:block">${typeof r==='string'?r:JSON.stringify(r)}</div>`;
+        })()}
+        <button class="rpt-pdf-btn" onclick="downloadRptPdf('${c.id}')">⬇ PDF</button>
       </td>`;
     } else {
       const allSubmitted = REVIEWERS.every(rv => {
@@ -1003,11 +1021,20 @@ window.genReport = async (id) => {
 Feedback:
 ${feedbacks}
 
-Return a JSON object with exactly these three keys:
+Return a JSON object with exactly this structure — three language keys (en, zh, pt), each containing two sub-keys (enc, con):
 {
-  "en": "2-3 paragraph English summary highlighting key themes from all reviewers",
-  "zh": "2-3段中文总结，提炼所有评委的核心观点",
-  "pt": "Resumo em português de 2-3 parágrafos destacando os temas principais"
+  "en": {
+    "enc": "2-3 sentences summarizing the ENCOURAGING themes across all reviewers (strengths, achievements)",
+    "con": "2-3 sentences summarizing the CONSTRUCTIVE themes across all reviewers (areas for improvement)"
+  },
+  "zh": {
+    "enc": "2-3句话总结所有评委的鼓励性反馈（优势与成就）",
+    "con": "2-3句话总结所有评委的建设性反馈（待提升方向）"
+  },
+  "pt": {
+    "enc": "2-3 frases resumindo os pontos ENCORAJADORES de todos os avaliadores (pontos fortes, conquistas)",
+    "con": "2-3 frases resumindo os pontos CONSTRUTIVOS de todos os avaliadores (áreas de melhoria)"
+  }
 }
 Return only valid JSON, no markdown fences.`;
 
@@ -1332,6 +1359,67 @@ async function translateAndShow(text, tgtLang, transEl) {
 })();
 // ── End Live Interpreter ───────────────────────────────────────
 
+// ── AI Report PDF Download ────────────────────────────────────
+window.downloadRptPdf = (id) => {
+  const cd = snap[id] || {};
+  const c = CANDS.find(x => x.id === id);
+  const aiReport = cd.aiReport || {};
+  const r = aiReport[lang] || aiReport.en || {};
+  const encL = T[lang].encL; const conL = T[lang].conL;
+  const encTxt = typeof r === 'object' ? (r.enc||"") : (typeof r==='string' ? r : "");
+  const conTxt = typeof r === 'object' ? (r.con||"") : "";
+
+  const reviewerRows = REVIEWERS.map(rv => {
+    const rk = rv.replace(/\s+/g,"_");
+    const fd = (cd.feedback && cd.feedback[rk]) || {};
+    if (!fd.submitted) return "";
+    const ckey = `${id}_${rk}_${lang}`;
+    const tr = fbTransCache[ckey] || {};
+    const enc = tr.enc || fd.encouraging || "";
+    const con = tr.constructive || fd.constructive || "";
+    return `<tr>
+      <td style="font-weight:600;padding:8px 12px;border-bottom:1px solid #e5e7eb;white-space:nowrap">${rv}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#065f46">${enc}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#92400e">${con}</td>
+    </tr>`;
+  }).join("");
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+  <title>BDM Review Report — ${c.name}</title>
+  <style>
+    body{font-family:system-ui,sans-serif;color:#111;padding:32px;max-width:900px;margin:0 auto;}
+    h1{font-size:20px;margin-bottom:4px;}
+    .sub{color:#6b7280;font-size:13px;margin-bottom:24px;}
+    .ai-section{display:flex;gap:16px;margin-bottom:28px;}
+    .ai-card{flex:1;border-radius:8px;padding:14px 16px;border:1px solid;}
+    .ai-enc{background:#ecfdf5;border-color:#a7f3d0;}
+    .ai-con{background:#fff7ed;border-color:#fed7aa;}
+    .ai-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+    .ai-enc .ai-lbl{color:#065f46;}.ai-con .ai-lbl{color:#92400e;}
+    .ai-txt{font-size:12px;line-height:1.6;}
+    table{width:100%;border-collapse:collapse;font-size:12px;}
+    th{background:#f9fafb;padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#6b7280;border-bottom:2px solid #e5e7eb;}
+    .badge{display:inline-block;background:#f3e8ff;color:#6d28d9;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;margin-bottom:16px;}
+    @media print{body{padding:16px;}}
+  </style></head><body>
+  <div class="badge">✦ AI Generated Report</div>
+  <h1>${c.name}</h1>
+  <div class="sub">BDM Promotion Review · ${new Date().toLocaleDateString()}</div>
+  <div class="ai-section">
+    <div class="ai-card ai-enc"><div class="ai-lbl">${encL}</div><div class="ai-txt">${encTxt}</div></div>
+    <div class="ai-card ai-con"><div class="ai-lbl">${conL}</div><div class="ai-txt">${conTxt}</div></div>
+  </div>
+  <table>
+    <thead><tr><th>Reviewer</th><th>${encL}</th><th>${conL}</th></tr></thead>
+    <tbody>${reviewerRows}</tbody>
+  </table>
+  </body></html>`;
+
+  const win = window.open("","_blank");
+  win.document.write(html);
+  win.document.close();
+  win.onload = () => { win.print(); };
+};
 // ── PDF Fullscreen Modal ──────────────────────────────────────
 window.openPdfModal = (url) => {
   document.getElementById("pdfModalFrame").src = url;
