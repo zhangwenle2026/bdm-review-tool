@@ -146,11 +146,15 @@ tbody tr:hover td:first-child{background:var(--hover);}
 .interp-orig{font-size:13px;color:rgba(255,255,255,.75);line-height:1.6;}
 .interp-trans{font-size:14px;color:#fff;font-weight:500;line-height:1.6;}
 .interp-interim{color:rgba(255,255,255,.4);font-style:italic;}
-/* Floating subtitle overlay — draggable */
-.subtitle-overlay{position:fixed;bottom:220px;left:50%;transform:translateX(-50%);z-index:600;max-width:800px;width:90%;display:none;cursor:grab;}
+/* Floating subtitle overlay — draggable + resizable */
+.subtitle-overlay{position:fixed;bottom:260px;left:50%;transform:translateX(-50%);z-index:600;width:700px;max-width:95vw;display:none;}
 .subtitle-overlay.on{display:block;}
-.subtitle-overlay.dragging{cursor:grabbing;}
-.subtitle-box{background:rgba(0,0,0,.8);color:#fff;font-size:18px;font-weight:500;line-height:1.5;padding:12px 24px;border-radius:10px;text-align:center;backdrop-filter:blur(4px);user-select:none;}
+.subtitle-box{background:rgba(0,0,0,.82);color:#fff;font-size:20px;font-weight:500;line-height:1.6;padding:14px 28px;border-radius:12px;text-align:center;backdrop-filter:blur(6px);user-select:none;min-height:52px;word-break:break-word;border:1px solid rgba(255,255,255,.12);}
+.subtitle-box:empty::after{content:"🎙 Subtitle will appear here";color:rgba(255,255,255,.3);font-size:14px;font-style:italic;}
+.subtitle-drag-handle{position:absolute;top:0;left:0;right:24px;bottom:0;cursor:grab;}
+.subtitle-drag-handle:active{cursor:grabbing;}
+.subtitle-resize-handle{position:absolute;bottom:0;right:0;width:20px;height:20px;cursor:se-resize;display:flex;align-items:flex-end;justify-content:flex-end;padding:3px;}
+.subtitle-resize-handle::after{content:"⇲";color:rgba(255,255,255,.4);font-size:13px;}
 /* interp body collapse */
 .interp-panel.collapsed .interp-body{display:none;}
 .interp-collapse-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;padding:5px 10px;border-radius:5px;font-size:13px;cursor:pointer;line-height:1;}
@@ -325,7 +329,9 @@ tbody tr:hover td:first-child{background:var(--hover);}
 
 <!-- Floating Subtitle Overlay -->
 <div class="subtitle-overlay" id="subtitleOverlay">
+  <div class="subtitle-drag-handle" id="subtitleDragHandle"></div>
   <div class="subtitle-box" id="subtitleBox"></div>
+  <div class="subtitle-resize-handle" id="subtitleResizeHandle"></div>
 </div>
 
 <div class="mbg" id="mBg">
@@ -1077,33 +1083,70 @@ async function translateChunk(text) {
   } catch(e) { console.warn("translate error", e); }
 }
 
-// ── Draggable subtitle overlay ────────────────────────────────
+// ── Draggable + Resizable subtitle overlay ────────────────────
 (function() {
-  let dragEl, startX, startY, origLeft, origTop, isDragging = false;
-  document.addEventListener("mousedown", e => {
-    const el = e.target.closest(".subtitle-overlay");
-    if (!el) return;
-    dragEl = el;
-    isDragging = true;
-    dragEl.classList.add("dragging");
-    const rect = dragEl.getBoundingClientRect();
-    // Switch from transform-based centering to absolute positioning
-    dragEl.style.left = rect.left + "px";
-    dragEl.style.top = rect.top + "px";
-    dragEl.style.transform = "none";
-    dragEl.style.bottom = "auto";
-    startX = e.clientX - rect.left;
-    startY = e.clientY - rect.top;
+  const overlay = document.getElementById("subtitleOverlay");
+  const dragHandle = document.getElementById("subtitleDragHandle");
+  const resizeHandle = document.getElementById("subtitleResizeHandle");
+
+  function anchorOverlay() {
+    // Convert from transform-centering to fixed pixel position
+    if (overlay.style.transform !== "none" && !overlay._anchored) {
+      const rect = overlay.getBoundingClientRect();
+      overlay.style.left = rect.left + "px";
+      overlay.style.top = rect.top + "px";
+      overlay.style.transform = "none";
+      overlay.style.bottom = "auto";
+      overlay._anchored = true;
+    }
+  }
+
+  // Drag
+  let dragging = false, dx = 0, dy = 0;
+  dragHandle.addEventListener("mousedown", e => {
+    anchorOverlay();
+    dragging = true;
+    const rect = overlay.getBoundingClientRect();
+    dx = e.clientX - rect.left;
+    dy = e.clientY - rect.top;
     e.preventDefault();
   });
-  document.addEventListener("mousemove", e => {
-    if (!isDragging || !dragEl) return;
-    dragEl.style.left = (e.clientX - startX) + "px";
-    dragEl.style.top  = (e.clientY - startY) + "px";
+
+  // Resize
+  let resizing = false, startW, startH, startRX, startRY;
+  resizeHandle.addEventListener("mousedown", e => {
+    anchorOverlay();
+    resizing = true;
+    const rect = overlay.getBoundingClientRect();
+    startW = rect.width;
+    startH = rect.height;
+    startRX = e.clientX;
+    startRY = e.clientY;
+    e.preventDefault();
+    e.stopPropagation();
   });
+
+  document.addEventListener("mousemove", e => {
+    if (dragging) {
+      overlay.style.left = (e.clientX - dx) + "px";
+      overlay.style.top  = (e.clientY - dy) + "px";
+    }
+    if (resizing) {
+      const newW = Math.max(200, startW + (e.clientX - startRX));
+      const newH = Math.max(50,  startH + (e.clientY - startRY));
+      overlay.style.width  = newW + "px";
+      overlay.style.maxWidth = "none";
+      overlay.style.height = newH + "px";
+      // Scale font size proportionally
+      const subBox = document.getElementById("subtitleBox");
+      const baseFontSize = Math.max(12, Math.round(newW / 35));
+      subBox.style.fontSize = baseFontSize + "px";
+    }
+  });
+
   document.addEventListener("mouseup", () => {
-    if (dragEl) dragEl.classList.remove("dragging");
-    isDragging = false; dragEl = null;
+    dragging = false;
+    resizing = false;
   });
 })();
 // ── End Live Interpreter ───────────────────────────────────────
