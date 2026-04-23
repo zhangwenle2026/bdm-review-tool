@@ -147,7 +147,7 @@ tbody tr:hover td:first-child{background:var(--hover);}
 .interp-trans{font-size:14px;color:#fff;font-weight:500;line-height:1.6;}
 .interp-interim{color:rgba(255,255,255,.4);font-style:italic;}
 /* Floating subtitle overlay — draggable + resizable */
-.subtitle-overlay{position:fixed;bottom:260px;left:50%;transform:translateX(-50%);z-index:600;width:700px;max-width:95vw;display:none;}
+.subtitle-overlay{position:fixed;bottom:260px;left:50%;transform:translateX(-50%);z-index:600;width:700px;max-width:95vw;display:none;cursor:grab;}
 .subtitle-overlay.on{display:block;}
 .subtitle-box{background:rgba(0,0,0,.82);color:#fff;font-size:20px;font-weight:500;line-height:1.6;padding:14px 28px;border-radius:12px;text-align:center;backdrop-filter:blur(6px);user-select:none;min-height:52px;word-break:break-word;border:1px solid rgba(255,255,255,.12);}
 .subtitle-orig{font-size:15px;color:rgba(255,255,255,.6);font-weight:400;margin-bottom:4px;min-height:1em;}
@@ -1168,41 +1168,42 @@ async function translateAndShow(text, tgtLang, transEl) {
 
 // ── Draggable + Resizable subtitle overlay ────────────────────
 (function() {
-  const overlay = document.getElementById("subtitleOverlay");
-  const dragHandle = document.getElementById("subtitleDragHandle");
+  const overlay     = document.getElementById("subtitleOverlay");
   const resizeHandle = document.getElementById("subtitleResizeHandle");
 
   function anchorOverlay() {
-    // Convert from transform-centering to fixed pixel position
-    if (overlay.style.transform !== "none" && !overlay._anchored) {
+    if (!overlay._anchored) {
       const rect = overlay.getBoundingClientRect();
-      overlay.style.left = rect.left + "px";
-      overlay.style.top = rect.top + "px";
+      overlay.style.left      = rect.left + "px";
+      overlay.style.top       = rect.top  + "px";
       overlay.style.transform = "none";
-      overlay.style.bottom = "auto";
-      overlay._anchored = true;
+      overlay.style.bottom    = "auto";
+      overlay._anchored       = true;
     }
   }
 
-  // Drag
   let dragging = false, dx = 0, dy = 0;
-  dragHandle.addEventListener("mousedown", e => {
+  let resizing = false, startW, startH, startRX, startRY;
+
+  // Drag — whole overlay, except resize handle
+  overlay.addEventListener("mousedown", e => {
+    if (e.target === resizeHandle || resizeHandle.contains(e.target)) return;
     anchorOverlay();
     dragging = true;
+    overlay.style.cursor = "grabbing";
     const rect = overlay.getBoundingClientRect();
     dx = e.clientX - rect.left;
     dy = e.clientY - rect.top;
     e.preventDefault();
   });
 
-  // Resize
-  let resizing = false, startW, startH, startRX, startRY;
+  // Resize — bottom-right corner handle
   resizeHandle.addEventListener("mousedown", e => {
     anchorOverlay();
     resizing = true;
     const rect = overlay.getBoundingClientRect();
-    startW = rect.width;
-    startH = rect.height;
+    startW  = rect.width;
+    startH  = rect.height;
     startRX = e.clientX;
     startRY = e.clientY;
     e.preventDefault();
@@ -1216,18 +1217,18 @@ async function translateAndShow(text, tgtLang, transEl) {
     }
     if (resizing) {
       const newW = Math.max(200, startW + (e.clientX - startRX));
-      const newH = Math.max(50,  startH + (e.clientY - startRY));
-      overlay.style.width  = newW + "px";
+      const newH = Math.max(60,  startH + (e.clientY - startRY));
+      overlay.style.width    = newW + "px";
       overlay.style.maxWidth = "none";
-      overlay.style.height = newH + "px";
-      // Scale font size proportionally
+      overlay.style.height   = newH + "px";
       const baseFontSize = Math.max(12, Math.round(newW / 35));
       document.getElementById("subtitleTrans").style.fontSize = baseFontSize + "px";
-      document.getElementById("subtitleOrig").style.fontSize = Math.max(10, Math.round(baseFontSize * 0.72)) + "px";
+      document.getElementById("subtitleOrig").style.fontSize  = Math.max(10, Math.round(baseFontSize * 0.72)) + "px";
     }
   });
 
   document.addEventListener("mouseup", () => {
+    if (dragging) overlay.style.cursor = "grab";
     dragging = false;
     resizing = false;
   });
