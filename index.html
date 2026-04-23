@@ -265,8 +265,19 @@ tbody tr:hover td:first-child{background:var(--hover);}
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-const GEMINI_KEY = "AIzaSyCvjLrGGhz-31RPSicD4piMBQ5JP_G52_U";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`;
+const OPENAI_KEY = "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";
+const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
+
+async function callAI(prompt) {
+  const res = await fetch(OPENAI_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${OPENAI_KEY}` },
+    body: JSON.stringify({ model: "gpt-4o-mini", messages: [{ role: "user", content: prompt }] })
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.choices?.[0]?.message?.content || "";
+}
 
 const fbApp = initializeApp({
   apiKey: "AIzaSyBVWWs6tkE1V7F50mxFdVztSVzbNS2Xq7M",
@@ -494,11 +505,7 @@ Return ONLY a single pipe-separated line in this format (no explanation, no extr
 
 Presentation text:
 ${rawText.slice(0, 3000)}`;
-    const body = { contents:[{ parts:[{ text: prompt }]}]};
-    const res = await fetch(GEMINI_URL, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)});
-    const data = await res.json();
-    if (data.error) { console.warn("basicInfo Gemini error:", data.error.message); return; }
-    const text = (data.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
+    const text = (await callAI(prompt)).trim();
     if (text.includes("|")) {
       await update(ref(db, `reviews/${id}`), { basicInfo: text });
       console.log("basicInfo saved:", text);
@@ -583,30 +590,43 @@ async function genTranslation(id, targetLang) {
   pptArea.innerHTML = `<div class="spin"></div> Translating…`;
   try {
     const langMap = { en:"English", zh:"Chinese (Simplified)", pt:"Brazilian Portuguese" };
-    const prompt = `Extract ALL text content from this presentation file and translate it into ${langMap[targetLang]}. Format as clean readable text preserving slide structure. Do not add commentary.`;
-    const body = { contents:[{ parts:[
-      { text: prompt },
-      { inline_data:{ mime_type: cd.fileType||"application/pdf", data: cd.fileBase64 }}
-    ]}]};
-    const res = await fetch(GEMINI_URL, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-    const data = await res.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "Translation failed.";
+    const rawText = await extractTextFromFile(cd.fileBase64, cd.fileType||"application/pdf");
+    const prompt = `Translate the following presentation content into ${langMap[targetLang]}. Format as clean readable text preserving slide structure. Do not add commentary.\n\n${rawText.slice(0,6000)}`;
+    const text = await callAI(prompt);
     pptArea.innerHTML = `<div style="background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:20px;font-size:13px;line-height:1.8;white-space:pre-wrap;text-align:left;width:100%">${text}</div>`;
   } catch(e) {
     pptArea.innerHTML = `<div style="color:#EF4444;font-size:13px">Translation failed. Please try again.</div>`;
   }
 }
 
-// Generate AI Summary
-// Extract text from PDF base64 using a simple text-layer approach via Gemini
+// Extract text from file using PDF.js (for PDFs) or basic base64 decode (for text-based files)
 async function extractTextFromFile(b64, mime) {
-  const body = { contents:[{ parts:[
-    { text: "Extract ALL text content from this document. Return plain text only, preserve structure with newlines. No commentary." },
-    { inline_data:{ mime_type: mime.includes("pdf") ? "application/pdf" : "application/vnd.openxmlformats-officedocument.presentationml.presentation", data: b64 }}
-  ]}]};
-  const res = await fetch(GEMINI_URL, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-  const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  try {
+    // For PDF: use PDF.js text extraction
+    if (mime.includes("pdf")) {
+      const binary = atob(b64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const pdfjsLib = window['pdfjs-dist/build/pdf'];
+      if (pdfjsLib) {
+        const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+        let fullText = "";
+        for (let p = 1; p <= Math.min(pdf.numPages, 30); p++) {
+          const page = await pdf.getPage(p);
+          const tc = await page.getTextContent();
+          fullText += tc.items.map(i => i.str).join(" ") + "\n";
+        }
+        if (fullText.trim().length > 50) return fullText;
+      }
+    }
+    // Fallback: send first 8000 chars of base64 decoded as text (works for text-heavy files)
+    const decoded = atob(b64);
+    const printable = decoded.replace(/[^\x20-\x7E\n\r\t]/g, ' ').replace(/ {3,}/g, ' ');
+    return printable.slice(0, 6000);
+  } catch(e) {
+    console.warn("extractTextFromFile failed", e);
+    return "";
+  }
 }
 
 window.genSummary = async () => {
@@ -641,11 +661,7 @@ Provide a structured evaluation in both English and Chinese using this exact JSO
 }
 Return only valid JSON, no markdown, no other text.`;
 
-    const body = { contents:[{ parts:[{ text: prompt }]}]};
-    const res = await fetch(GEMINI_URL, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-    const data = await res.json();
-    if (data.error) throw new Error(data.error.message);
-    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+    const raw = await callAI(prompt);
     const clean = raw.replace(/```json\n?/g,"").replace(/```\n?/g,"").trim();
     let parsed;
     try { parsed = JSON.parse(clean); } catch(e) { parsed = { assessment_en: raw, assessment_zh: raw }; }
@@ -769,10 +785,7 @@ Return a JSON object with:
 }
 Return only valid JSON.`;
 
-    const body = { contents:[{ parts:[{ text: prompt }]}]};
-    const res = await fetch(GEMINI_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-    const data = await res.json();
-    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+    const raw = await callAI(prompt);
     const clean = raw.replace(/```json\n?/g,"").replace(/```\n?/g,"").trim();
     let parsed;
     try { parsed = JSON.parse(clean); } catch(e) { parsed = {en: raw, pt: raw}; }
