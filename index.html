@@ -217,6 +217,9 @@ tbody tr:hover td:first-child{background:var(--hover);}
   </div>
 </div>
 
+<div id="demoBanner" style="display:none;background:#7C3AED;color:#fff;text-align:center;padding:6px 16px;font-size:12px;font-weight:600;letter-spacing:.3px;">
+  🧪 DEMO MODE — Sample data only. No real candidate information is shown.
+</div>
 <header class="hdr">
   <div class="logo">
     <span class="logo-badge">KEETA</span>
@@ -394,6 +397,8 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const AI_PROXY = "https://bdm-review.zhangwenele2026.workers.dev";
+const IS_DEMO = new URLSearchParams(location.search).get("demo") === "1";
+const DB_ROOT = IS_DEMO ? "demo/reviews" : "reviews";
 
 async function callAI(prompt) {
   const res = await fetch(AI_PROXY, {
@@ -417,7 +422,7 @@ const fbApp = initializeApp({
 });
 const db = getDatabase(fbApp);
 
-const CANDS = [
+const REAL_CANDS = [
   {id:"lucas",   name:"Lucas Nada",       mis:"", time:"09:20–10:00"},
   {id:"karina",  name:"Karina Colomina",   mis:"", time:"10:00–10:40"},
   {id:"leonardo",name:"Leonardo Mello",    mis:"", time:"10:40–11:20"},
@@ -427,6 +432,17 @@ const CANDS = [
   {id:"thiago",  name:"Thiago Dalaqua",    mis:"", time:"14:50–15:30"},
   {id:"sabrina", name:"Sabrina Fernandes", mis:"", time:"15:30–16:10"},
 ];
+const DEMO_CANDS = [
+  {id:"candidate_a", name:"Candidate A", mis:"demo001", time:"09:20–10:00"},
+  {id:"candidate_b", name:"Candidate B", mis:"demo002", time:"10:00–10:40"},
+  {id:"candidate_c", name:"Candidate C", mis:"demo003", time:"10:40–11:20"},
+  {id:"candidate_d", name:"Candidate D", mis:"demo004", time:"11:20–12:00"},
+  {id:"candidate_e", name:"Candidate E", mis:"demo005", time:"13:30–14:10"},
+  {id:"candidate_f", name:"Candidate F", mis:"demo006", time:"14:10–14:50"},
+  {id:"candidate_g", name:"Candidate G", mis:"demo007", time:"14:50–15:30"},
+  {id:"candidate_h", name:"Candidate H", mis:"demo008", time:"15:30–16:10"},
+];
+const CANDS = IS_DEMO ? DEMO_CANDS : REAL_CANDS;
 const REVIEWERS = ["Eric Zhang","Ava Tian","James Feng","Daniel Albuquerque","Jay Lin"];
 const fbTransCache = {}; // key: `${candId}_${rk}_${lang}` → {enc, con}
 
@@ -522,7 +538,7 @@ const T = {
 let lang = "en", me = "", curId = "", asTimer = null, snap = {};
 
 // Real-time listener
-onValue(ref(db, "reviews"), s => {
+onValue(ref(db, DB_ROOT), s => {
   snap = s.val() || {};
   renderTable();
 });
@@ -670,7 +686,7 @@ window.uploadFile = async (id, input) => {
   const reader = new FileReader();
   reader.onload = async e => {
     const b64 = e.target.result.split(",")[1];
-    await update(ref(db, `reviews/${id}`), { fileBase64: b64, fileName: file.name, fileType: file.type });
+    await update(ref(db, `${DB_ROOT}/${id}`), { fileBase64: b64, fileName: file.name, fileType: file.type });
     // Auto-extract basic info
     extractBasicInfo(id, b64, file.type);
   };
@@ -694,7 +710,7 @@ Presentation text:
 ${rawText.slice(0, 3000)}`;
     const text = (await callAI(prompt)).trim();
     if (text.includes("|")) {
-      await update(ref(db, `reviews/${id}`), { basicInfo: text });
+      await update(ref(db, `${DB_ROOT}/${id}`), { basicInfo: text });
       console.log("basicInfo saved:", text);
     }
   } catch(e) { console.warn("basicInfo extraction failed", e); }
@@ -911,7 +927,7 @@ Return ONLY this JSON (no markdown, no extra text):
     const clean = raw.replace(/```json\n?/g,"").replace(/```\n?/g,"").trim();
     let parsed;
     try { parsed = JSON.parse(clean); } catch(e) { parsed = { assessment_en: raw, assessment_zh: raw }; }
-    await update(ref(db, `reviews/${curId}`), { aiSummary: parsed });
+    await update(ref(db, `${DB_ROOT}/${curId}`), { aiSummary: parsed });
     renderAISummary(parsed);
   } catch(e) {
     console.error("genSummary error:", e);
@@ -979,7 +995,7 @@ async function autoSave(id) {
   const rk = me.replace(/\s+/g,"_");
   const enc = document.getElementById("taEnc").value;
   const con = document.getElementById("taCon").value;
-  await update(ref(db, `reviews/${id}/feedback/${rk}`), { draft_enc: enc, draft_con: con });
+  await update(ref(db, `${DB_ROOT}/${id}/feedback/${rk}`), { draft_enc: enc, draft_con: con });
   const asvLbl = document.getElementById("asvLbl");
   asvLbl.textContent = T[lang].asv;
   asvLbl.classList.add("ok");
@@ -999,7 +1015,7 @@ window.confirmSub = async () => {
   const rk = me.replace(/\s+/g,"_");
   const enc = document.getElementById("taEnc").value;
   const con = document.getElementById("taCon").value;
-  await update(ref(db, `reviews/${curId}/feedback/${rk}`), {
+  await update(ref(db, `${DB_ROOT}/${curId}/feedback/${rk}`), {
     encouraging: enc, constructive: con, submitted: true,
     submittedAt: Date.now(), reviewer: me
   });
@@ -1014,7 +1030,7 @@ window.confirmSub = async () => {
 window.unsubmitFeedback = async () => {
   if (!me || !curId) return;
   const rk = me.replace(/\s+/g,"_");
-  await update(ref(db, `reviews/${curId}/feedback/${rk}`), { submitted: false });
+  await update(ref(db, `${DB_ROOT}/${curId}/feedback/${rk}`), { submitted: false });
   document.getElementById("taEnc").disabled = false;
   document.getElementById("taCon").disabled = false;
   document.getElementById("subNote").textContent = "";
@@ -1067,7 +1083,7 @@ IMPORTANT: Your entire response must be ONLY the JSON object. Do not include any
     } catch(e) {
       parsed = { en: {enc: raw, con: ""}, zh: {enc: raw, con: ""}, pt: {enc: raw, con: ""} };
     }
-    await update(ref(db, `reviews/${id}`), { aiReport: parsed });
+    await update(ref(db, `${DB_ROOT}/${id}`), { aiReport: parsed });
   } catch(e) { alert("Report generation failed. Please try again."); }
 };
 
@@ -1096,6 +1112,10 @@ window.confirmGate = () => {
 };
 
 // Init
+if (IS_DEMO) {
+  const banner = document.getElementById("demoBanner");
+  if (banner) banner.style.display = "block";
+}
 applyI18n();
 renderTable();
 
